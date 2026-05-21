@@ -1,0 +1,4 @@
+[package]
+name = "vis-parser"
+version.workspace = true
+edition.workspace = true

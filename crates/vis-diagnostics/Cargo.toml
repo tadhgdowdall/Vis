@@ -1,0 +1,4 @@
+[package]
+name = "vis-diagnostics"
+version.workspace = true
+edition.workspace = true

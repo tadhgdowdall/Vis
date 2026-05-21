@@ -1,0 +1,4 @@
+[package]
+name = "vis-rules"
+version.workspace = true
+edition.workspace = true

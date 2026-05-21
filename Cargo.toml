@@ -1,6 +1,14 @@
-[package]
-name = "Vis"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+resolver = "2"
+members = [
+    "crates/vis-cli",
+    "crates/vis-parser",
+    "crates/vis-ir",
+    "crates/vis-analyzer",
+    "crates/vis-rules",
+    "crates/vis-diagnostics"
+]
 
-[dependencies]
+[workspace.package]
+edition = "2024"
+version = "0.1.0"

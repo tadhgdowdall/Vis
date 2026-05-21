@@ -1,0 +1,4 @@
+[package]
+name = "vis-cli"
+version.workspace = true
+edition.workspace = true
