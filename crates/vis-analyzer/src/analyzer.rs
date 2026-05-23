@@ -29,13 +29,14 @@ fn analyze_node(node: &ParsedNode) -> A11yNode {
     ) || (tag_name == "a" && href.is_some())
         || tab_index.is_some_and(|value| value.trim() != "-1");
 
-    let accessible_name = aria_label
-        .filter(|label| !label.is_empty())
-        .or_else(|| match tag_name.as_str() {
-            "img" => alt_text.clone(),
-            "button" => (!text_content.is_empty()).then_some(text_content.clone()),
-            _ => None,
-        });
+    let accessible_name =
+        aria_label
+            .filter(|label| !label.is_empty())
+            .or_else(|| match tag_name.as_str() {
+                "img" => alt_text.clone(),
+                "button" => (!text_content.is_empty()).then_some(text_content.clone()),
+                _ => None,
+            });
 
     A11yNode {
         tag_name,
