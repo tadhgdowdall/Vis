@@ -104,4 +104,75 @@ mod tests {
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].code, "a11y::clickable_div");
     }
+
+    #[test]
+    fn emits_diagnostic_for_unlabeled_native_input() {
+        let parsed = parse_html(r#"<input type="text" />"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "a11y::form_control_label");
+    }
+
+    #[test]
+    fn does_not_emit_diagnostic_for_input_with_native_label() {
+        let parsed = parse_html(
+            r#"
+            <div>
+              <label for="email">Email</label>
+              <input id="email" type="email" />
+            </div>
+            "#,
+        )
+        .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(
+            diagnostics
+                .iter()
+                .all(|diagnostic| diagnostic.code != "a11y::form_control_label")
+        );
+    }
+
+    #[test]
+    fn emits_semantics_diagnostic_for_anchor_used_as_button_without_href() {
+        let parsed =
+            parse_html(r#"<a onClick="openDialog()">Open dialog</a>"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "a11y::link_semantics");
+    }
+
+    #[test]
+    fn emits_semantics_diagnostic_for_anchor_with_bogus_action_href() {
+        let parsed = parse_html(r##"<a href="#" onClick="saveDraft()">Save draft</a>"##)
+            .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "a11y::link_semantics");
+    }
+
+    #[test]
+    fn does_not_emit_link_semantics_diagnostic_for_real_navigation_link() {
+        let parsed = parse_html(r#"<a href="/products">Products</a>"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(
+            diagnostics
+                .iter()
+                .all(|diagnostic| diagnostic.code != "a11y::link_semantics")
+        );
+    }
 }

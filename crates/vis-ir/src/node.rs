@@ -3,6 +3,8 @@ use vis_diagnostics::Span;
 #[derive(Clone, Debug)]
 pub struct A11yNode {
     pub tag_name: String,
+    pub href: Option<String>,
+    pub input_type: Option<String>,
     pub interactive: bool,
     pub focusable: bool,
     pub accessible_name: Option<String>,
