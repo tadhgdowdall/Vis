@@ -70,4 +70,38 @@ mod tests {
 
         assert!(diagnostics.is_empty());
     }
+
+    #[test]
+    fn does_not_emit_button_diagnostic_for_aria_labelledby() {
+        let parsed = parse_html(
+            r#"
+            <main>
+              <span id="save-label">Save draft</span>
+              <button aria-labelledby="save-label"></button>
+            </main>
+            "#,
+        )
+        .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(
+            diagnostics
+                .iter()
+                .all(|diagnostic| diagnostic.code != "a11y::button_label")
+        );
+    }
+
+    #[test]
+    fn emits_semantics_diagnostic_for_clickable_span() {
+        let parsed = parse_html(r#"<span onClick="openDialog()">Open dialog</span>"#)
+            .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "a11y::clickable_div");
+    }
 }

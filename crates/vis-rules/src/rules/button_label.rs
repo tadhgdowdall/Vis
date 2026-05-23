@@ -11,8 +11,11 @@ pub fn check(file_path: &str, node: &A11yNode, diagnostics: &mut Vec<Diagnostic>
     {
         diagnostics.push(Diagnostic {
             code: "a11y::button_label".to_string(),
-            message: "Button is missing an accessible label.".to_string(),
-            help: Some("Add visible text or aria-label to the button.".to_string()),
+            message: "Button is missing an accessible name.".to_string(),
+            help: Some(
+                "Prefer visible button text. If the button has no visible text, use aria-label or aria-labelledby."
+                    .to_string(),
+            ),
             file_path: file_path.to_string(),
             span: node.span,
         });
