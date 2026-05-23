@@ -5,10 +5,19 @@ version = 4
 [[package]]
 name = "vis-analyzer"
 version = "0.1.0"
+dependencies = [
+ "vis-ir",
+ "vis-parser",
+]
 
 [[package]]
 name = "vis-cli"
 version = "0.1.0"
+dependencies = [
+ "vis-analyzer",
+ "vis-parser",
+ "vis-rules",
+]
 
 [[package]]
 name = "vis-diagnostics"
@@ -24,7 +33,14 @@ dependencies = [
 [[package]]
 name = "vis-parser"
 version = "0.1.0"
+dependencies = [
+ "vis-diagnostics",
+]
 
 [[package]]
 name = "vis-rules"
 version = "0.1.0"
+dependencies = [
+ "vis-diagnostics",
+ "vis-ir",
+]

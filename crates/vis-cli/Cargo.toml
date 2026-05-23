@@ -2,3 +2,8 @@
 name = "vis-cli"
 version.workspace = true
 edition.workspace = true
+
+[dependencies]
+vis-analyzer = { path = "../vis-analyzer" }
+vis-parser = { path = "../vis-parser" }
+vis-rules = { path = "../vis-rules" }
