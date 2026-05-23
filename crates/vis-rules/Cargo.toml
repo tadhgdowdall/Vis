@@ -6,3 +6,7 @@ edition.workspace = true
 [dependencies]
 vis-diagnostics = { path = "../vis-diagnostics" }
 vis-ir = { path = "../vis-ir" }
+
+[dev-dependencies]
+vis-analyzer = { path = "../vis-analyzer" }
+vis-parser = { path = "../vis-parser" }

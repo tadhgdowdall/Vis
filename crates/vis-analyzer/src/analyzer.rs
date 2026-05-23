@@ -53,3 +53,46 @@ fn analyze_node(node: &ParsedNode) -> A11yNode {
 fn normalize_text(value: &str) -> String {
     value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::analyze;
+    use vis_parser::parse_html;
+
+    #[test]
+    fn derives_button_name_from_visible_text() {
+        let parsed = parse_html("<button>Save draft</button>").expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let button = &analyzed[0];
+
+        assert_eq!(button.tag_name, "button");
+        assert!(button.interactive);
+        assert!(button.focusable);
+        assert_eq!(button.accessible_name.as_deref(), Some("Save draft"));
+    }
+
+    #[test]
+    fn uses_aria_label_when_present() {
+        let parsed =
+            parse_html(r#"<button aria-label="Close"></button>"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+
+        assert_eq!(analyzed[0].accessible_name.as_deref(), Some("Close"));
+    }
+
+    #[test]
+    fn marks_clickable_div_as_interactive_but_not_focusable() {
+        let parsed = parse_html(r#"<div onClick="saveDraft()">Save draft</div>"#)
+            .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let div = &analyzed[0];
+
+        assert_eq!(div.tag_name, "div");
+        assert!(div.interactive);
+        assert!(!div.focusable);
+        assert!(div.has_click_handler);
+    }
+}

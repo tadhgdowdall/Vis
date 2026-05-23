@@ -36,6 +36,6 @@ impl ParsedNode {
             text.push_str(child_text.trim());
         }
 
-        text.trim().to_string()
+        text.split_whitespace().collect::<Vec<_>>().join(" ")
     }
 }

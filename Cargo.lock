@@ -42,6 +42,8 @@ dependencies = [
 name = "vis-rules"
 version = "0.1.0"
 dependencies = [
+ "vis-analyzer",
  "vis-diagnostics",
  "vis-ir",
+ "vis-parser",
 ]

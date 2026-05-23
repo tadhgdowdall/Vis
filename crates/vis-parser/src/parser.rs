@@ -313,3 +313,46 @@ fn is_void_element(tag_name: &str) -> bool {
             | "wbr"
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::parse_document;
+
+    #[test]
+    fn parses_nested_nodes_and_text_content() {
+        let source = r#"<main><button>Save <span>now</span></button></main>"#;
+
+        let document = parse_document(source).expect("document should parse");
+
+        assert_eq!(document.len(), 1);
+        let main = &document[0];
+        assert_eq!(main.tag_name, "main");
+        assert_eq!(main.children.len(), 1);
+
+        let button = &main.children[0];
+        assert_eq!(button.tag_name, "button");
+        assert_eq!(button.text(), "Save now");
+        assert_eq!(button.children.len(), 1);
+        assert_eq!(button.children[0].tag_name, "span");
+    }
+
+    #[test]
+    fn parses_attributes_for_html_and_jsx_style_values() {
+        let source = r#"<div onClick={save} data-id="123" disabled></div>"#;
+
+        let document = parse_document(source).expect("document should parse");
+        let node = &document[0];
+
+        assert_eq!(node.attribute_value("onClick"), Some("{save}"));
+        assert_eq!(node.attribute_value("data-id"), Some("123"));
+        assert_eq!(node.attribute_value("disabled"), None);
+        assert_eq!(node.attributes.len(), 3);
+    }
+
+    #[test]
+    fn returns_error_for_unterminated_comment() {
+        let error = parse_document("<!-- missing end").expect_err("parse should fail");
+
+        assert_eq!(error.to_string(), "unterminated HTML comment");
+    }
+}
