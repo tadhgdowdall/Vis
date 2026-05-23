@@ -2,7 +2,7 @@ use vis_diagnostics::Diagnostic;
 use vis_ir::A11yNode;
 
 pub fn check(file_path: &str, node: &A11yNode, diagnostics: &mut Vec<Diagnostic>) {
-    if node.tag_name == "button"
+    if is_button_like(node)
         && node.interactive
         && node
             .accessible_name
@@ -23,5 +23,16 @@ pub fn check(file_path: &str, node: &A11yNode, diagnostics: &mut Vec<Diagnostic>
 
     for child in &node.children {
         check(file_path, child, diagnostics);
+    }
+}
+
+fn is_button_like(node: &A11yNode) -> bool {
+    match node.tag_name.as_str() {
+        "button" => true,
+        "input" => matches!(
+            node.input_type.as_deref(),
+            Some("button" | "image" | "submit" | "reset")
+        ),
+        _ => false,
     }
 }

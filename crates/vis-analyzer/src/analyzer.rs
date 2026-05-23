@@ -108,6 +108,7 @@ fn analyze_node(node: &ParsedNode, context: &AnalysisContext) -> A11yNode {
     let tab_index = node.attribute_value("tabindex");
     let aria_labelledby = node.attribute_value("aria-labelledby");
     let aria_label = node.attribute_value("aria-label").map(normalize_text);
+    let input_value = node.attribute_value("value").map(normalize_text);
     let text_content = normalize_text(&node.text());
     let alt_text = node.attribute_value("alt").map(normalize_text);
 
@@ -128,11 +129,27 @@ fn analyze_node(node: &ParsedNode, context: &AnalysisContext) -> A11yNode {
             .then_some(text_content.clone())
             .or_else(|| accessible_name_from_references(aria_labelledby, context))
             .or_else(|| aria_label.filter(|label| !label.is_empty())),
-        "input" | "select" | "textarea" => native_label_for_control(node, context)
+        "input" => accessible_name_for_input(
+            node,
+            input_type.as_deref(),
+            input_value,
+            alt_text.clone(),
+            aria_labelledby,
+            aria_label,
+            context,
+        ),
+        "select" | "textarea" => native_label_for_control(node, context)
             .or_else(|| accessible_name_from_references(aria_labelledby, context))
             .or_else(|| aria_label.filter(|label| !label.is_empty())),
         "img" => alt_text.clone(),
-        _ => accessible_name_from_references(aria_labelledby, context)
+        "a" => (!text_content.is_empty())
+            .then_some(text_content.clone())
+            .or_else(|| accessible_name_from_descendant_images(node))
+            .or_else(|| accessible_name_from_references(aria_labelledby, context))
+            .or_else(|| aria_label.filter(|label| !label.is_empty())),
+        _ => (!text_content.is_empty())
+            .then_some(text_content.clone())
+            .or_else(|| accessible_name_from_references(aria_labelledby, context))
             .or_else(|| aria_label.filter(|label| !label.is_empty())),
     };
 
@@ -168,6 +185,62 @@ fn accessible_name_from_references(
     let label = normalize_text(&label);
 
     (!label.is_empty()).then_some(label)
+}
+
+fn accessible_name_for_input(
+    node: &ParsedNode,
+    input_type: Option<&str>,
+    input_value: Option<String>,
+    alt_text: Option<String>,
+    aria_labelledby: Option<&str>,
+    aria_label: Option<String>,
+    context: &AnalysisContext,
+) -> Option<String> {
+    match input_type {
+        Some("submit") => input_value
+            .filter(|value| !value.is_empty())
+            .or_else(|| Some("Submit".to_string())),
+        Some("reset") => input_value
+            .filter(|value| !value.is_empty())
+            .or_else(|| Some("Reset".to_string())),
+        Some("button") => input_value
+            .filter(|value| !value.is_empty())
+            .or_else(|| accessible_name_from_references(aria_labelledby, context))
+            .or_else(|| aria_label.filter(|label| !label.is_empty())),
+        Some("image") => alt_text
+            .filter(|text| !text.is_empty())
+            .or_else(|| accessible_name_from_references(aria_labelledby, context))
+            .or_else(|| aria_label.filter(|label| !label.is_empty())),
+        _ => native_label_for_control(node, context)
+            .or_else(|| accessible_name_from_references(aria_labelledby, context))
+            .or_else(|| aria_label.filter(|label| !label.is_empty())),
+    }
+}
+
+fn accessible_name_from_descendant_images(node: &ParsedNode) -> Option<String> {
+    let label = collect_descendant_image_alt_text(node).join(" ");
+    let label = normalize_text(&label);
+
+    (!label.is_empty()).then_some(label)
+}
+
+fn collect_descendant_image_alt_text(node: &ParsedNode) -> Vec<String> {
+    let mut labels = Vec::new();
+
+    for child in &node.children {
+        if child.tag_name == "img"
+            && let Some(alt_text) = child.attribute_value("alt")
+        {
+            let normalized = normalize_text(alt_text);
+            if !normalized.is_empty() {
+                labels.push(normalized);
+            }
+        }
+
+        labels.extend(collect_descendant_image_alt_text(child));
+    }
+
+    labels
 }
 
 fn native_label_for_control(node: &ParsedNode, context: &AnalysisContext) -> Option<String> {
@@ -275,6 +348,36 @@ mod tests {
 
         assert_eq!(anchor.href.as_deref(), Some("/account"));
         assert!(anchor.focusable);
+    }
+
+    #[test]
+    fn derives_link_name_from_child_image_alt_text() {
+        let parsed =
+            parse_html(r#"<a href="/reports"><img src="/icon.png" alt="View reports" /></a>"#)
+                .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+
+        assert_eq!(analyzed[0].accessible_name.as_deref(), Some("View reports"));
+    }
+
+    #[test]
+    fn derives_submit_input_name_from_default_value() {
+        let parsed = parse_html(r#"<input type="submit" />"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+
+        assert_eq!(analyzed[0].accessible_name.as_deref(), Some("Submit"));
+    }
+
+    #[test]
+    fn derives_image_input_name_from_alt_text() {
+        let parsed =
+            parse_html(r#"<input type="image" alt="Search" />"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+
+        assert_eq!(analyzed[0].accessible_name.as_deref(), Some("Search"));
     }
 
     #[test]

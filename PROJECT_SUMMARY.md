@@ -80,6 +80,65 @@ vis check .
 
 And the build fails if accessibility guarantees are violated.
 
+## Parsing Strategy
+
+Vis should use a hybrid parsing architecture rather than trying to force every framework through one generic parser.
+
+The core idea is:
+
+- use production-grade parsers for the source languages themselves
+- add framework adapters for framework-specific file formats and semantics
+- normalize everything into the same accessibility IR before rules run
+
+This keeps the compiler pipeline consistent while still being realistic about how modern frontend stacks differ.
+
+### Planned Parsing Layers
+
+#### Core Parsers
+
+- HTML: a browser-grade HTML parser
+- JavaScript / TypeScript / JSX / TSX: a production-grade Rust parser
+
+#### Framework Adapters
+
+- React: parse JSX/TSX and map native elements plus common component patterns into IR
+- Next.js: build on the React path first, then add framework-aware semantics for things like `next/link`, `next/image`, and other Next-specific abstractions
+- Vue: parse SFC structure, then analyze template and script sections separately
+- Svelte: use a dedicated adapter for `.svelte` files
+- Astro: use a dedicated adapter for `.astro` files
+
+### Near-Term Priority
+
+The first production-grade target should be:
+
+- React
+- Next.js
+
+That means the next real parser milestone is not “support every framework a little bit.”
+
+It is:
+
+- replace the current prototype JSX/TSX parser with a real parser
+- keep HTML on a real standards-compliant path
+- introduce framework adapter boundaries early
+- make React and Next.js the first serious end-to-end analysis target
+
+### Why This Approach
+
+This is the most practical route to production-grade analysis.
+
+It avoids:
+
+- relying on a simplistic hand-rolled parser long-term
+- pretending Vue, Svelte, Astro, and React all have the same source model
+- coupling rules directly to framework syntax
+
+It supports:
+
+- better correctness on real codebases
+- cleaner expansion across frameworks
+- a stable semantic IR that rules can depend on
+
 ## Why Rust
 
 Rust is a strong fit because Vis is fundamentally:
@@ -151,9 +210,9 @@ Vis works in stages:
 ```text
 Source files
     ↓
-Parser
+Source-specific parser
     ↓
-Syntax AST
+Framework adapter
     ↓
 Accessibility IR
     ↓
@@ -179,6 +238,11 @@ A11yNode {
 ```
 
 This is what makes Vis compiler-like rather than just another linter.
+
+The parser and adapter stages are separate on purpose:
+
+- the parser understands syntax
+- the adapter understands framework conventions and maps them into semantics
 
 ## Starting Point
 
