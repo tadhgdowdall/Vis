@@ -26,7 +26,7 @@ pub fn check(file_path: &str, node: &A11yNode, diagnostics: &mut Vec<Diagnostic>
 }
 
 fn is_labelable_control(node: &A11yNode) -> bool {
-    match node.tag_name.as_str() {
+    match node.resolved_tag_name.as_str() {
         "select" | "textarea" => true,
         "input" => !matches!(
             node.input_type.as_deref(),

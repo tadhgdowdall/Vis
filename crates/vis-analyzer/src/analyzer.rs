@@ -4,7 +4,14 @@ use vis_ir::A11yNode;
 use vis_parser::ParsedNode;
 
 pub fn analyze(nodes: &[ParsedNode]) -> Vec<A11yNode> {
-    let context = AnalysisContext::new(nodes);
+    analyze_with_map(nodes, None)
+}
+
+pub fn analyze_with_map(
+    nodes: &[ParsedNode],
+    component_map: Option<HashMap<String, String>>,
+) -> Vec<A11yNode> {
+    let context = AnalysisContext::new(nodes, component_map);
 
     nodes
         .iter()
@@ -15,10 +22,11 @@ pub fn analyze(nodes: &[ParsedNode]) -> Vec<A11yNode> {
 struct AnalysisContext {
     labels_by_id: HashMap<String, String>,
     labels_by_control_id: HashMap<String, String>,
+    component_map: HashMap<String, String>,
 }
 
 impl AnalysisContext {
-    fn new(nodes: &[ParsedNode]) -> Self {
+    fn new(nodes: &[ParsedNode], component_map: Option<HashMap<String, String>>) -> Self {
         let mut labels_by_id = HashMap::new();
         let mut labels_by_control_id = HashMap::new();
 
@@ -27,12 +35,17 @@ impl AnalysisContext {
         }
 
         for node in nodes {
-            collect_control_labels(node, &mut labels_by_control_id);
+            collect_control_labels(
+                node,
+                &mut labels_by_control_id,
+                component_map.as_ref().unwrap_or(&HashMap::new()),
+            );
         }
 
         Self {
             labels_by_id,
             labels_by_control_id,
+            component_map: component_map.unwrap_or_default(),
         }
     }
 }
@@ -53,8 +66,10 @@ fn collect_labels_by_id(node: &ParsedNode, labels_by_id: &mut HashMap<String, St
 fn collect_control_labels(
     node: &ParsedNode,
     labels_by_control_id: &mut HashMap<String, String>,
+    component_map: &HashMap<String, String>,
 ) {
-    if node.tag_name.eq_ignore_ascii_case("label") {
+    let resolved = resolve_element(&node.tag_name.to_ascii_lowercase(), component_map);
+    if resolved == "label" {
         let label_text = normalize_text(&node.text());
 
         if !label_text.is_empty() {
@@ -68,7 +83,7 @@ fn collect_control_labels(
     }
 
     for child in &node.children {
-        collect_control_labels(child, labels_by_control_id);
+        collect_control_labels(child, labels_by_control_id, component_map);
     }
 }
 
@@ -78,6 +93,7 @@ fn analyze_node(
     context: &AnalysisContext,
 ) -> A11yNode {
     let tag_name = node.tag_name.to_ascii_lowercase();
+    let resolved_tag = resolve_element(&tag_name, &context.component_map);
     let input_type = node
         .attribute_value("type")
         .map(|value| value.to_ascii_lowercase());
@@ -93,7 +109,7 @@ fn analyze_node(
     let text_content = normalize_text(&node.text());
     let alt_text = node.attribute_value("alt").map(normalize_text);
 
-    let child_wrapping_label: Option<String> = if tag_name == "label" {
+    let child_wrapping_label: Option<String> = if resolved_tag == "label" {
         let label_text = normalize_text(&node.text());
         if !label_text.is_empty() {
             Some(label_text)
@@ -106,18 +122,18 @@ fn analyze_node(
     let child_wrapping_label: Option<&str> = child_wrapping_label.as_deref();
 
     let interactive = matches!(
-        tag_name.as_str(),
+        resolved_tag.as_str(),
         "button" | "input" | "select" | "textarea"
-    ) || (tag_name == "a" && href.is_some())
+    ) || (resolved_tag == "a" && href.is_some())
         || has_click_handler;
 
     let focusable = matches!(
-        tag_name.as_str(),
+        resolved_tag.as_str(),
         "button" | "input" | "select" | "textarea"
-    ) || (tag_name == "a" && href.is_some())
+    ) || (resolved_tag == "a" && href.is_some())
         || tab_index.is_some_and(|value| value.trim() != "-1");
 
-    let accessible_name = match tag_name.as_str() {
+    let accessible_name = match resolved_tag.as_str() {
         "button" => (!text_content.is_empty())
             .then_some(text_content.clone())
             .or_else(|| accessible_name_from_references(aria_labelledby, context))
@@ -138,7 +154,7 @@ fn analyze_node(
         "img" => alt_text.clone(),
         "a" => (!text_content.is_empty())
             .then_some(text_content.clone())
-            .or_else(|| accessible_name_from_descendant_images(node))
+            .or_else(|| accessible_name_from_descendant_images(node, &context.component_map))
             .or_else(|| accessible_name_from_references(aria_labelledby, context))
             .or_else(|| aria_label.filter(|label| !label.is_empty())),
         _ => (!text_content.is_empty())
@@ -149,6 +165,7 @@ fn analyze_node(
 
     A11yNode {
         tag_name,
+        resolved_tag_name: resolved_tag,
         href: href.map(str::to_string),
         input_type,
         interactive,
@@ -212,18 +229,25 @@ fn accessible_name_for_input(
     }
 }
 
-fn accessible_name_from_descendant_images(node: &ParsedNode) -> Option<String> {
-    let label = collect_descendant_image_alt_text(node).join(" ");
+fn accessible_name_from_descendant_images(
+    node: &ParsedNode,
+    component_map: &HashMap<String, String>,
+) -> Option<String> {
+    let label = collect_descendant_image_alt_text(node, component_map).join(" ");
     let label = normalize_text(&label);
 
     (!label.is_empty()).then_some(label)
 }
 
-fn collect_descendant_image_alt_text(node: &ParsedNode) -> Vec<String> {
+fn collect_descendant_image_alt_text(
+    node: &ParsedNode,
+    component_map: &HashMap<String, String>,
+) -> Vec<String> {
     let mut labels = Vec::new();
 
     for child in &node.children {
-        if child.tag_name == "img"
+        let resolved = resolve_element(&child.tag_name.to_ascii_lowercase(), component_map);
+        if resolved == "img"
             && let Some(alt_text) = child.attribute_value("alt")
         {
             let normalized = normalize_text(alt_text);
@@ -232,7 +256,7 @@ fn collect_descendant_image_alt_text(node: &ParsedNode) -> Vec<String> {
             }
         }
 
-        labels.extend(collect_descendant_image_alt_text(child));
+        labels.extend(collect_descendant_image_alt_text(child, component_map));
     }
 
     labels
@@ -250,6 +274,63 @@ fn native_label_for_control(
     }
 
     wrapping_label.map(str::to_string)
+}
+
+fn resolve_element(component: &str, component_map: &HashMap<String, String>) -> String {
+    if let Some(mapped) = component_map.get(component) {
+        return mapped.clone();
+    }
+
+    if matches!(
+        component,
+        "button"
+            | "input"
+            | "a"
+            | "img"
+            | "select"
+            | "textarea"
+            | "label"
+            | "div"
+            | "span"
+            | "main"
+            | "nav"
+            | "header"
+            | "footer"
+            | "section"
+            | "article"
+            | "aside"
+            | "form"
+            | "p"
+            | "h1"
+            | "h2"
+            | "h3"
+            | "h4"
+            | "h5"
+            | "h6"
+            | "ul"
+            | "ol"
+            | "li"
+            | "table"
+            | "tr"
+            | "td"
+            | "th"
+            | "br"
+            | "hr"
+    ) {
+        return component.to_string();
+    }
+
+    match component {
+        "btn" | "iconbutton" | "closebutton" | "togglebutton" | "menubutton" => "button",
+        "textfield" | "textinput" | "searchinput" => "input",
+        "link" | "navlink" | "hyperlink" | "skiplink" => "a",
+        "image" | "picture" | "avatar" | "thumbnail" => "img",
+        "dropdown" | "combobox" | "multiselect" => "select",
+        "textbox" | "richtext" => "textarea",
+        "formlabel" | "fieldlabel" => "label",
+        _ => component,
+    }
+    .to_string()
 }
 
 fn normalize_text(value: &str) -> String {

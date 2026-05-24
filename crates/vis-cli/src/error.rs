@@ -1,36 +1,22 @@
-use std::{error::Error, fmt, io};
-
-use vis_parser::ParseError;
+use std::{error::Error, fmt};
 
 #[derive(Debug)]
 pub enum CliError {
     Usage,
-    ReadFile { path: String, source: io::Error },
-    UnsupportedFileType(String),
-    Parse(ParseError),
+    NoTargets,
 }
 
 impl fmt::Display for CliError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Usage => f.write_str("usage: vis check <file.html|file.jsx|file.tsx>"),
-            Self::ReadFile { path, source } => {
-                write!(f, "failed to read {path}: {source}")
-            }
-            Self::UnsupportedFileType(path) => {
-                write!(f, "unsupported file type for {path}")
-            }
-            Self::Parse(error) => write!(f, "parse error: {error}"),
+            Self::Usage => f.write_str(
+                "usage: vis check [path ...]\n\n  path    file or directory to check (defaults to current directory)"
+            ),
+            Self::NoTargets => f.write_str(
+                "no supported files found (looked for .html, .jsx, .tsx, .js)"
+            ),
         }
     }
 }
 
-impl Error for CliError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::ReadFile { source, .. } => Some(source),
-            Self::Parse(error) => Some(error),
-            Self::Usage | Self::UnsupportedFileType(_) => None,
-        }
-    }
-}
+impl Error for CliError {}

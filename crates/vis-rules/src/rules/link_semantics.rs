@@ -2,7 +2,7 @@ use vis_diagnostics::Diagnostic;
 use vis_ir::A11yNode;
 
 pub fn check(file_path: &str, node: &A11yNode, diagnostics: &mut Vec<Diagnostic>) {
-    if node.tag_name == "a"
+    if node.resolved_tag_name == "a"
         && node.has_click_handler
         && looks_like_action_anchor(node.href.as_deref())
     {
