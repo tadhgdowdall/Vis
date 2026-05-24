@@ -39,7 +39,6 @@ pub fn parse_tsx(source: &str) -> Result<Vec<ParsedNode>, ParseError> {
 
     let mut collector = JsxCollector {
         roots: Vec::new(),
-        inside_jsx_tree: false,
         source,
     };
 
@@ -49,60 +48,31 @@ pub fn parse_tsx(source: &str) -> Result<Vec<ParsedNode>, ParseError> {
 
 struct JsxCollector<'src> {
     roots: Vec<ParsedNode>,
-    inside_jsx_tree: bool,
     source: &'src str,
 }
 
 impl Visit for JsxCollector<'_> {
     fn visit_jsx_element(&mut self, node: &JSXElement) {
-        let was_inside = self.inside_jsx_tree;
-
-        if !was_inside {
-            self.roots.push(convert_jsx_element(node, self.source));
-            self.inside_jsx_tree = true;
-        }
-
-        for child in &node.children {
-            if let JSXElementChild::JSXExprContainer(expr) = child {
-                let saved = self.inside_jsx_tree;
-                self.inside_jsx_tree = false;
-                expr.visit_with(self);
-                self.inside_jsx_tree = saved;
-            }
-        }
-
-        for attr in &node.opening.attrs {
-            if let JSXAttrOrSpread::JSXAttr(attr) = attr {
-                if let Some(JSXAttrValue::JSXExprContainer(expr)) = &attr.value {
-                    let saved = self.inside_jsx_tree;
-                    self.inside_jsx_tree = false;
-                    expr.visit_with(self);
-                    self.inside_jsx_tree = saved;
-                }
-            }
-        }
-
-        self.inside_jsx_tree = was_inside;
+        self.roots.push(convert_jsx_element(node, self.source));
     }
 
     fn visit_jsx_fragment(&mut self, node: &JSXFragment) {
-        let was_inside = self.inside_jsx_tree;
+        self.roots.push(convert_jsx_fragment(node, self.source));
+    }
+}
 
-        if !was_inside {
-            self.roots.push(convert_jsx_fragment(node, self.source));
-            self.inside_jsx_tree = true;
-        }
+struct NestedJsxCollector<'src> {
+    nodes: Vec<ParsedNode>,
+    source: &'src str,
+}
 
-        for child in &node.children {
-            if let JSXElementChild::JSXExprContainer(expr) = child {
-                let saved = self.inside_jsx_tree;
-                self.inside_jsx_tree = false;
-                expr.visit_with(self);
-                self.inside_jsx_tree = saved;
-            }
-        }
+impl Visit for NestedJsxCollector<'_> {
+    fn visit_jsx_element(&mut self, node: &JSXElement) {
+        self.nodes.push(convert_jsx_element(node, self.source));
+    }
 
-        self.inside_jsx_tree = was_inside;
+    fn visit_jsx_fragment(&mut self, node: &JSXFragment) {
+        self.nodes.push(convert_jsx_fragment(node, self.source));
     }
 }
 
@@ -176,12 +146,18 @@ fn convert_jsx_child(child: &JSXElementChild, source: &str) -> Option<ParsedNode
                 let (start, end) = span_to_offsets(expression.span());
                 let snippet = source.get(start..end).unwrap_or("").to_string();
 
+                let mut nested = NestedJsxCollector {
+                    nodes: Vec::new(),
+                    source,
+                };
+                expression.as_ref().visit_with(&mut nested);
+
                 Some(ParsedNode {
                     tag_name: String::new(),
                     attributes: Vec::new(),
                     text_content: snippet,
                     span: convert_span(expression.span()),
-                    children: Vec::new(),
+                    children: nested.nodes,
                 })
             }
             JSXExpr::JSXEmptyExpr(_) => None,
@@ -404,8 +380,11 @@ mod tests {
         let source = r#"<div>{show && <span>visible</span>}</div>"#;
         let nodes = parse_tsx(source).expect("tsx should parse");
 
-        assert_eq!(nodes.len(), 2);
+        assert_eq!(nodes.len(), 1);
         assert_eq!(nodes[0].tag_name, "div");
-        assert_eq!(nodes[1].tag_name, "span");
+        assert_eq!(nodes[0].children.len(), 1);
+        assert!(nodes[0].children[0].text_content.contains("span"));
+        assert_eq!(nodes[0].children[0].children.len(), 1);
+        assert_eq!(nodes[0].children[0].children[0].tag_name, "span");
     }
 }

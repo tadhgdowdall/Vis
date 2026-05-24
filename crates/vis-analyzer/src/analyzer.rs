@@ -8,34 +8,31 @@ pub fn analyze(nodes: &[ParsedNode]) -> Vec<A11yNode> {
 
     nodes
         .iter()
-        .map(|node| analyze_node(node, &context))
+        .map(|node| analyze_node(node, None, &context))
         .collect()
 }
 
 struct AnalysisContext {
     labels_by_id: HashMap<String, String>,
     labels_by_control_id: HashMap<String, String>,
-    labels_by_control_span: HashMap<usize, String>,
 }
 
 impl AnalysisContext {
     fn new(nodes: &[ParsedNode]) -> Self {
         let mut labels_by_id = HashMap::new();
         let mut labels_by_control_id = HashMap::new();
-        let mut labels_by_control_span = HashMap::new();
 
         for node in nodes {
             collect_labels_by_id(node, &mut labels_by_id);
         }
 
         for node in nodes {
-            collect_control_labels(node, &mut labels_by_control_id, &mut labels_by_control_span);
+            collect_control_labels(node, &mut labels_by_control_id);
         }
 
         Self {
             labels_by_id,
             labels_by_control_id,
-            labels_by_control_span,
         }
     }
 }
@@ -56,7 +53,6 @@ fn collect_labels_by_id(node: &ParsedNode, labels_by_id: &mut HashMap<String, St
 fn collect_control_labels(
     node: &ParsedNode,
     labels_by_control_id: &mut HashMap<String, String>,
-    labels_by_control_span: &mut HashMap<usize, String>,
 ) {
     if node.tag_name.eq_ignore_ascii_case("label") {
         let label_text = normalize_text(&node.text());
@@ -66,36 +62,21 @@ fn collect_control_labels(
                 .attribute_value("for")
                 .or_else(|| node.attribute_value("htmlFor"))
             {
-                labels_by_control_id.insert(target_id.to_string(), label_text.clone());
-            }
-
-            let labeled_controls = collect_descendant_controls(node);
-            if labeled_controls.len() == 1 {
-                labels_by_control_span.insert(labeled_controls[0].span.start, label_text);
+                labels_by_control_id.insert(target_id.to_string(), label_text);
             }
         }
     }
 
     for child in &node.children {
-        collect_control_labels(child, labels_by_control_id, labels_by_control_span);
+        collect_control_labels(child, labels_by_control_id);
     }
 }
 
-fn collect_descendant_controls(node: &ParsedNode) -> Vec<&ParsedNode> {
-    let mut controls = Vec::new();
-
-    for child in &node.children {
-        if is_labelable_control(&child.tag_name) {
-            controls.push(child);
-        }
-
-        controls.extend(collect_descendant_controls(child));
-    }
-
-    controls
-}
-
-fn analyze_node(node: &ParsedNode, context: &AnalysisContext) -> A11yNode {
+fn analyze_node(
+    node: &ParsedNode,
+    wrapping_label: Option<&str>,
+    context: &AnalysisContext,
+) -> A11yNode {
     let tag_name = node.tag_name.to_ascii_lowercase();
     let input_type = node
         .attribute_value("type")
@@ -111,6 +92,18 @@ fn analyze_node(node: &ParsedNode, context: &AnalysisContext) -> A11yNode {
     let input_value = node.attribute_value("value").map(normalize_text);
     let text_content = normalize_text(&node.text());
     let alt_text = node.attribute_value("alt").map(normalize_text);
+
+    let child_wrapping_label: Option<String> = if tag_name == "label" {
+        let label_text = normalize_text(&node.text());
+        if !label_text.is_empty() {
+            Some(label_text)
+        } else {
+            wrapping_label.map(|s| s.to_string())
+        }
+    } else {
+        wrapping_label.map(|s| s.to_string())
+    };
+    let child_wrapping_label: Option<&str> = child_wrapping_label.as_deref();
 
     let interactive = matches!(
         tag_name.as_str(),
@@ -131,6 +124,7 @@ fn analyze_node(node: &ParsedNode, context: &AnalysisContext) -> A11yNode {
             .or_else(|| aria_label.filter(|label| !label.is_empty())),
         "input" => accessible_name_for_input(
             node,
+            wrapping_label,
             input_type.as_deref(),
             input_value,
             alt_text.clone(),
@@ -138,7 +132,7 @@ fn analyze_node(node: &ParsedNode, context: &AnalysisContext) -> A11yNode {
             aria_label,
             context,
         ),
-        "select" | "textarea" => native_label_for_control(node, context)
+        "select" | "textarea" => native_label_for_control(node, wrapping_label, context)
             .or_else(|| accessible_name_from_references(aria_labelledby, context))
             .or_else(|| aria_label.filter(|label| !label.is_empty())),
         "img" => alt_text.clone(),
@@ -166,7 +160,7 @@ fn analyze_node(node: &ParsedNode, context: &AnalysisContext) -> A11yNode {
         children: node
             .children
             .iter()
-            .map(|child| analyze_node(child, context))
+            .map(|child| analyze_node(child, child_wrapping_label, context))
             .collect(),
     }
 }
@@ -189,6 +183,7 @@ fn accessible_name_from_references(
 
 fn accessible_name_for_input(
     node: &ParsedNode,
+    wrapping_label: Option<&str>,
     input_type: Option<&str>,
     input_value: Option<String>,
     alt_text: Option<String>,
@@ -211,7 +206,7 @@ fn accessible_name_for_input(
             .filter(|text| !text.is_empty())
             .or_else(|| accessible_name_from_references(aria_labelledby, context))
             .or_else(|| aria_label.filter(|label| !label.is_empty())),
-        _ => native_label_for_control(node, context)
+        _ => native_label_for_control(node, wrapping_label, context)
             .or_else(|| accessible_name_from_references(aria_labelledby, context))
             .or_else(|| aria_label.filter(|label| !label.is_empty())),
     }
@@ -243,21 +238,18 @@ fn collect_descendant_image_alt_text(node: &ParsedNode) -> Vec<String> {
     labels
 }
 
-fn native_label_for_control(node: &ParsedNode, context: &AnalysisContext) -> Option<String> {
+fn native_label_for_control(
+    node: &ParsedNode,
+    wrapping_label: Option<&str>,
+    context: &AnalysisContext,
+) -> Option<String> {
     if let Some(id) = node.attribute_value("id")
         && let Some(label) = context.labels_by_control_id.get(id)
     {
         return Some(label.clone());
     }
 
-    context
-        .labels_by_control_span
-        .get(&node.span.start)
-        .cloned()
-}
-
-fn is_labelable_control(tag_name: &str) -> bool {
-    matches!(tag_name, "input" | "select" | "textarea")
+    wrapping_label.map(str::to_string)
 }
 
 fn normalize_text(value: &str) -> String {
