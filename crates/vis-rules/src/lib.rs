@@ -392,4 +392,134 @@ mod tests {
 
         assert!(diagnostics.iter().all(|d| d.code != "a11y::autocomplete"));
     }
+
+    #[test]
+    fn flags_empty_heading() {
+        let parsed = parse_html("<main><h1></h1></main>").expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().any(|d| d.code == "a11y::empty_heading"));
+    }
+
+    #[test]
+    fn allows_heading_with_text() {
+        let parsed = parse_html("<main><h1>Page Title</h1></main>").expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::empty_heading"));
+    }
+
+    #[test]
+    fn flags_placeholder_used_as_sole_label() {
+        let parsed = parse_html(r#"<input type="text" placeholder="Enter name" />"#)
+            .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d.code == "a11y::placeholder_label")
+        );
+    }
+
+    #[test]
+    fn allows_placeholder_with_label() {
+        let parsed = parse_html(
+            r#"<label for="name">Name</label><input id="name" type="text" placeholder="Enter name" />"#,
+        )
+        .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(
+            diagnostics
+                .iter()
+                .all(|d| d.code != "a11y::placeholder_label")
+        );
+    }
+
+    #[test]
+    fn flags_title_attribute_as_sole_label() {
+        let parsed =
+            parse_html(r#"<input type="text" title="Search" />"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().any(|d| d.code == "a11y::title_label"));
+    }
+
+    #[test]
+    fn allows_title_with_accessible_name() {
+        let parsed = parse_html(r#"<input type="text" title="Search" aria-label="Search" />"#)
+            .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::title_label"));
+    }
+
+    #[test]
+    fn flags_form_without_submit_button() {
+        let parsed = parse_html(r#"<form><input type="text" id="name" /></form>"#)
+            .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().any(|d| d.code == "a11y::form_no_submit"));
+    }
+
+    #[test]
+    fn allows_form_with_button_submit() {
+        let parsed =
+            parse_html(r#"<form><input type="text" /><button type="submit">Go</button></form>"#)
+                .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::form_no_submit"));
+    }
+
+    #[test]
+    fn allows_form_with_input_submit() {
+        let parsed =
+            parse_html(r#"<form><input type="text" /><input type="submit" value="Go" /></form>"#)
+                .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::form_no_submit"));
+    }
+
+    #[test]
+    fn allows_form_with_onsubmit_handler() {
+        let parsed = parse_html(r#"<form onSubmit="handleSubmit"><input type="text" /></form>"#)
+            .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::form_no_submit"));
+    }
+
+    #[test]
+    fn does_not_flag_empty_form() {
+        let parsed = parse_html(r#"<form></form>"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::form_no_submit"));
+    }
 }

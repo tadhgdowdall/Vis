@@ -15,6 +15,9 @@ pub struct A11yNode {
     pub heading_level: Option<u8>,
     pub lang: Option<String>,
     pub autocomplete: Option<String>,
+    pub placeholder: Option<String>,
+    pub title_attr: Option<String>,
+    pub has_submit_handler: bool,
     pub span: Span,
     pub children: Vec<A11yNode>,
 }

@@ -109,6 +109,12 @@ fn analyze_node(
     let alt_text = node.attribute_value("alt").map(normalize_text);
     let lang = node.attribute_value("lang");
     let autocomplete = node.attribute_value("autocomplete");
+    let placeholder = node.attribute_value("placeholder").map(normalize_text);
+    let title_attr = node.attribute_value("title").map(normalize_text);
+    let has_submit_handler = node
+        .attributes
+        .iter()
+        .any(|attribute| attribute.name.eq_ignore_ascii_case("onsubmit"));
     let heading_level = heading_level_from_tag(&resolved_tag);
 
     let child_wrapping_label: Option<String> = if resolved_tag == "label" {
@@ -179,6 +185,9 @@ fn analyze_node(
         heading_level,
         lang: lang.map(str::to_string),
         autocomplete: autocomplete.map(str::to_string),
+        placeholder,
+        title_attr,
+        has_submit_handler,
         span: node.span,
         children: node
             .children
