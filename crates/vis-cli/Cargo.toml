@@ -8,3 +8,4 @@ vis-analyzer = { path = "../vis-analyzer" }
 vis-diagnostics = { path = "../vis-diagnostics" }
 vis-parser = { path = "../vis-parser" }
 vis-rules = { path = "../vis-rules" }
+walkdir = "2.5.0"
