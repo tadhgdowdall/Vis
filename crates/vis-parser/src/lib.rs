@@ -1,7 +1,6 @@
 mod ast;
 mod error;
 mod html;
-mod parser;
 mod tsx;
 
 pub use ast::{Attribute, ParsedNode};
