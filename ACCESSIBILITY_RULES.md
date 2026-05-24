@@ -22,13 +22,18 @@ WCAG mappings are, and what's planned.
 | Rule | Code | WCAG SC | Level |
 |------|------|---------|-------|
 | Image missing alt text | `a11y::missing_alt` | [1.1.1 Non-text Content](https://www.w3.org/WAI/WCAG22/Understanding/non-text-content) | A |
-| Button missing accessible name | `a11y::button_label` | [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value) | A |
-| Clickable div used as button | `a11y::clickable_div` | [2.1.1 Keyboard](https://www.w3.org/WAI/WCAG22/Understanding/keyboard), [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value) | A |
-| Form control missing label | `a11y::form_control_label` | [1.3.1 Info and Relationships](https://www.w3.org/WAI/WCAG22/Understanding/info-and-relationships), [3.3.2 Labels or Instructions](https://www.w3.org/WAI/WCAG22/Understanding/labels-or-instructions) | A |
+| Heading hierarchy skip | `a11y::heading_hierarchy` | [1.3.1 Info and Relationships](https://www.w3.org/WAI/WCAG22/Understanding/info-and-relationships) | A |
+| `lang` attribute on `<html>` | `a11y::html_lang` | [3.1.1 Language of Page](https://www.w3.org/WAI/WCAG22/Understanding/language-of-page) | A |
+| `<title>` element present and non-empty | `a11y::page_title` | [2.4.2 Page Titled](https://www.w3.org/WAI/WCAG22/Understanding/page-titled) | A |
 | Link missing accessible name | `a11y::link_label` | [2.4.4 Link Purpose (In Context)](https://www.w3.org/WAI/WCAG22/Understanding/link-purpose-in-context), [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value) | A |
 | Anchor used as button | `a11y::link_semantics` | [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value) | A |
+| `tabindex` > 0 | `a11y::tabindex_misuse` | [2.4.3 Focus Order](https://www.w3.org/WAI/WCAG22/Understanding/focus-order) | A |
+| Clickable div used as button | `a11y::clickable_div` | [2.1.1 Keyboard](https://www.w3.org/WAI/WCAG22/Understanding/keyboard), [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value) | A |
+| Button missing accessible name | `a11y::button_label` | [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value) | A |
+| Form control missing label | `a11y::form_control_label` | [1.3.1 Info and Relationships](https://www.w3.org/WAI/WCAG22/Understanding/info-and-relationships), [3.3.2 Labels or Instructions](https://www.w3.org/WAI/WCAG22/Understanding/labels-or-instructions) | A |
+| Autocomplete on form fields | `a11y::autocomplete` | [1.3.5 Identify Input Purpose](https://www.w3.org/WAI/WCAG22/Understanding/identify-input-purpose) | AA |
 
-All 6 rules target WCAG 2.2 Level A — the minimum compliance bar. They are
+All 11 rules target WCAG 2.2 Level A (plus one AA). They are
 deterministic, produce very few false positives, and every violation maps to a
 concrete, actionable fix.
 
@@ -45,46 +50,10 @@ Each row is rated on:
 - **False positive risk** — Low (deterministic), Medium (some ambiguity),
   High (heuristic, opt-in recommended)
 
-### Top Priority (P1)
+### Top Priority (P1) — DONE ✓
 
-These close critical WCAG Level A gaps with deterministic, low-false-positive
-checks:
-
-| # | Rule | WCAG SC | Level | Difficulty | FP Risk |
-|---|------|---------|-------|------------|---------|
-| 7 | `tabindex` > 0 | 2.4.3 Focus Order | A | Easy | Low |
-| 8 | Heading hierarchy skip | 1.3.1 Info and Relationships | A | Easy | Low |
-| 9 | `lang` attribute on `<html>` | 3.1.1 Language of Page | A | Easy | Low |
-| 10 | `<title>` element present and non-empty | 2.4.2 Page Titled | A | Easy | Low |
-| 11 | Autocomplete on form fields | 1.3.5 Identify Input Purpose | AA | Medium | Low |
-
-Details:
-
-**Rule 7: `tabindex` > 0** — Any positive `tabindex` value breaks the natural
-focus order. Flag `tabindex="1"`, `tabindex="2"`, etc. `tabindex="0"` and
-`tabindex="-1"` are fine.
-
-**Rule 8: Heading hierarchy skip** — `<h1>` followed by `<h3>` without an
-intermediate `<h2>` breaks document outline for screen readers. Track the
-current heading level and flag jumps > 1. This also catches pages with no `<h1>`.
-
-**Rule 9: `lang` on `<html>`** — Screen readers need a language hint to load
-the correct pronunciation rules. `lang` must be a valid BCP 47 tag. A
-heuristic: flag missing `lang`, flag obviously invalid values (empty, "x"),
-don't try to validate full BCP 47.
-
-**Rule 10: `<title>` element** — Every page needs a non-empty `<title>`. This
-is trivially checkable on full HTML documents and component files that render
-`<head>`.
-
-**Rule 11: Autocomplete on form fields** — Inputs of type `email`, `name`,
-`tel`, `address`, `postal-code`, `country`, `cc-*`, `username`, `password` (new
-and current) should have `autocomplete` set. Use the [WCAG Input Purposes
-list](https://www.w3.org/TR/WCAG22/#input-purposes). This is deterministic
-because inputs have well-known types mapped to specific autocomplete values.
-Only flag when both `type` AND context suggest autocomplete is expected. Do NOT
-require autocomplete on search fields, generic text inputs, or custom
-components where purpose is unclear.
+All 5 P1 rules are now implemented: tabindex, heading hierarchy, html lang,
+page title, and autocomplete.
 
 ### Priority 2 (P2)
 

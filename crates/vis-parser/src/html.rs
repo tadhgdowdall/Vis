@@ -7,6 +7,12 @@ pub fn parse_html(source: &str) -> Result<Vec<ParsedNode>, ParseError> {
     let document = Html::parse_document(source);
     let root = document.root_element();
 
+    let has_explicit_html = source.to_ascii_lowercase().contains("<html");
+
+    if has_explicit_html {
+        return Ok(vec![convert_element(root, source)]);
+    }
+
     let body = root
         .children()
         .filter_map(ElementRef::wrap)

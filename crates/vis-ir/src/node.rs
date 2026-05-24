@@ -11,6 +11,10 @@ pub struct A11yNode {
     pub accessible_name: Option<String>,
     pub has_click_handler: bool,
     pub alt_text: Option<String>,
+    pub tab_index: Option<String>,
+    pub heading_level: Option<u8>,
+    pub lang: Option<String>,
+    pub autocomplete: Option<String>,
     pub span: Span,
     pub children: Vec<A11yNode>,
 }

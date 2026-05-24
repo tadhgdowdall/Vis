@@ -108,6 +108,9 @@ fn analyze_node(
     let input_value = node.attribute_value("value").map(normalize_text);
     let text_content = normalize_text(&node.text());
     let alt_text = node.attribute_value("alt").map(normalize_text);
+    let lang = node.attribute_value("lang");
+    let autocomplete = node.attribute_value("autocomplete");
+    let heading_level = heading_level_from_tag(&resolved_tag);
 
     let child_wrapping_label: Option<String> = if resolved_tag == "label" {
         let label_text = normalize_text(&node.text());
@@ -173,6 +176,10 @@ fn analyze_node(
         accessible_name,
         has_click_handler,
         alt_text,
+        tab_index: tab_index.map(str::to_string),
+        heading_level,
+        lang: lang.map(str::to_string),
+        autocomplete: autocomplete.map(str::to_string),
         span: node.span,
         children: node
             .children
@@ -331,6 +338,18 @@ fn resolve_element(component: &str, component_map: &HashMap<String, String>) -> 
         _ => component,
     }
     .to_string()
+}
+
+fn heading_level_from_tag(tag: &str) -> Option<u8> {
+    match tag {
+        "h1" => Some(1),
+        "h2" => Some(2),
+        "h3" => Some(3),
+        "h4" => Some(4),
+        "h5" => Some(5),
+        "h6" => Some(6),
+        _ => None,
+    }
 }
 
 fn normalize_text(value: &str) -> String {
