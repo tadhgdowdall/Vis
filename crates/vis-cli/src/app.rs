@@ -1,11 +1,13 @@
 use std::{fs, path::Path, process};
+use std::collections::HashMap;
 
-use vis_analyzer::analyze;
+use vis_analyzer::analyze_with_map;
 use vis_diagnostics::render_diagnostic;
 use vis_parser::{parse_html, parse_jsx};
 use vis_rules::run_all;
 use walkdir::WalkDir;
 
+use crate::config::Config;
 use crate::error::CliError;
 
 const SKIP_DIRS: &[&str] = &[
@@ -42,10 +44,12 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<i32, CliError> {
         paths
     };
 
-    check_targets(&paths)
+    let config = Config::load().unwrap_or_default();
+
+    check_targets(&paths, &config.components)
 }
 
-fn check_targets(paths: &[String]) -> Result<i32, CliError> {
+fn check_targets(paths: &[String], component_map: &HashMap<String, String>) -> Result<i32, CliError> {
     let mut files_checked = 0usize;
     let mut issues_found = 0usize;
     let mut error_count = 0usize;
@@ -59,9 +63,9 @@ fn check_targets(paths: &[String]) -> Result<i32, CliError> {
         }
 
         if path.is_dir() {
-            scan_directory(path, &mut files_checked, &mut issues_found, &mut error_count);
+            scan_directory(path, component_map, &mut files_checked, &mut issues_found, &mut error_count);
         } else if path.is_file() {
-            match check_file(path) {
+            match check_file(path, component_map) {
                 Ok(n) => {
                     files_checked += 1;
                     issues_found += n;
@@ -98,7 +102,7 @@ fn check_targets(paths: &[String]) -> Result<i32, CliError> {
     }
 }
 
-fn check_file(path: &Path) -> Result<usize, String> {
+fn check_file(path: &Path, component_map: &HashMap<String, String>) -> Result<usize, String> {
     let source = fs::read_to_string(path).map_err(|e| format!("{e}"))?;
 
     let parsed = match path.extension().and_then(|e| e.to_str()) {
@@ -108,7 +112,13 @@ fn check_file(path: &Path) -> Result<usize, String> {
     }
     .map_err(|e| format!("{e}"))?;
 
-    let analyzed = analyze(&parsed);
+    let map = if component_map.is_empty() {
+        None
+    } else {
+        Some(component_map.clone())
+    };
+
+    let analyzed = analyze_with_map(&parsed, map);
     let diagnostics = run_all(&path.to_string_lossy(), &analyzed);
 
     for diagnostic in &diagnostics {
@@ -121,6 +131,7 @@ fn check_file(path: &Path) -> Result<usize, String> {
 
 fn scan_directory(
     dir: &Path,
+    component_map: &HashMap<String, String>,
     files_checked: &mut usize,
     issues_found: &mut usize,
     error_count: &mut usize,
@@ -154,7 +165,7 @@ fn scan_directory(
             continue;
         }
 
-        match check_file(path) {
+        match check_file(path, component_map) {
             Ok(n) => {
                 *files_checked += 1;
                 *issues_found += n;
