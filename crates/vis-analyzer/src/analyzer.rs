@@ -119,6 +119,18 @@ fn analyze_node(
         .filter(|name| name.to_ascii_lowercase().starts_with("aria-"))
         .map(|name| name.to_ascii_lowercase())
         .collect();
+    let aria_hidden = node
+        .attribute_value("aria-hidden")
+        .is_some_and(|v| v.eq_ignore_ascii_case("true"));
+    let suppression_codes: Vec<String> = node
+        .attribute_value("data-vis-ignore")
+        .map(|v| {
+            v.split_whitespace()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        })
+        .unwrap_or_default();
     let has_submit_handler = node
         .attributes
         .iter()
@@ -198,6 +210,8 @@ fn analyze_node(
         has_submit_handler,
         role,
         aria_attrs,
+        aria_hidden,
+        suppression_codes,
         span: node.span,
         children: node
             .children

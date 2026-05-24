@@ -2,7 +2,10 @@ use vis_diagnostics::{Diagnostic, Severity};
 use vis_ir::A11yNode;
 
 pub fn check(file_path: &str, node: &A11yNode, diagnostics: &mut Vec<Diagnostic>) {
-    if node.heading_level.is_some() && node.accessible_name.as_deref().is_none_or(str::is_empty) {
+    if node.heading_level.is_some()
+        && node.accessible_name.as_deref().is_none_or(str::is_empty)
+        && !node.aria_hidden
+    {
         diagnostics.push(Diagnostic {
             code: "a11y::empty_heading".to_string(),
             message: "Heading element has no content.".to_string(),

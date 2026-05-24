@@ -2,7 +2,7 @@ pub mod rules;
 
 use std::collections::HashMap;
 
-use vis_diagnostics::{Diagnostic, Severity};
+use vis_diagnostics::{Diagnostic, Severity, Span};
 use vis_ir::A11yNode;
 
 type RuleFn = fn(&str, &A11yNode, &mut Vec<Diagnostic>);
@@ -45,7 +45,26 @@ pub fn run_all_with_config(
         }
     }
 
+    diagnostics.retain(|d| {
+        let suppressed = nodes
+            .iter()
+            .any(|node| find_node_suppression(node, d.span, d.code.as_str()));
+        !suppressed
+    });
+
     diagnostics
+}
+
+fn find_node_suppression(node: &A11yNode, span: Span, code: &str) -> bool {
+    if node.span.start == span.start && node.span.end == span.end {
+        return node
+            .suppression_codes
+            .iter()
+            .any(|c| c == "all" || c == code);
+    }
+    node.children
+        .iter()
+        .any(|child| find_node_suppression(child, span, code))
 }
 
 #[cfg(test)]
@@ -613,6 +632,39 @@ mod tests {
         let analyzed = analyze(&parsed);
         let diagnostics = run_all("example.html", &analyzed);
 
-        assert!(diagnostics.iter().all(|d| d.code == "a11y::redundant_role"));
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::redundant_role"));
+    }
+
+    #[test]
+    fn suppresses_diagnostic_with_data_vis_ignore() {
+        let parsed =
+            parse_html(r#"<div onClick="save()" data-vis-ignore="a11y::clickable_div">Save</div>"#)
+                .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::clickable_div"));
+    }
+
+    #[test]
+    fn suppresses_all_diagnostics_with_data_vis_ignore_all() {
+        let parsed =
+            parse_html(r#"<button data-vis-ignore="all"></button>"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::button_label"));
+    }
+
+    #[test]
+    fn respects_aria_hidden_for_empty_heading() {
+        let parsed = parse_html(r#"<h2 aria-hidden="true"></h2>"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::empty_heading"));
     }
 }

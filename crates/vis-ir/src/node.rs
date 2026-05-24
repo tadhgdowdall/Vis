@@ -20,6 +20,8 @@ pub struct A11yNode {
     pub has_submit_handler: bool,
     pub role: Option<String>,
     pub aria_attrs: Vec<String>,
+    pub aria_hidden: bool,
+    pub suppression_codes: Vec<String>,
     pub span: Span,
     pub children: Vec<A11yNode>,
 }

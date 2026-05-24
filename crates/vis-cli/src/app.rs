@@ -105,6 +105,7 @@ fn check_targets(
                     }
                 }
                 Err(e) => {
+                    files_checked += 1;
                     eprintln!("error: {}: {}", path.display(), e);
                     error_count += 1;
                 }
@@ -139,8 +140,10 @@ fn check_targets(
         }
     }
 
+    let has_issues = total_issues > 0 || error_count > 0;
+
     println!();
-    if total_issues > 0 {
+    if has_issues {
         if json {
             eprintln!(
                 "{} file{} scanned, {} issue{} found",
@@ -272,6 +275,7 @@ fn scan_directory(
                 }
             }
             Err(e) => {
+                *files_checked += 1;
                 eprintln!("error: {}: {}", path.display(), e);
                 *error_count += 1;
             }
