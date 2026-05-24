@@ -2,7 +2,7 @@ use vis_diagnostics::Diagnostic;
 use vis_ir::A11yNode;
 
 pub fn check(file_path: &str, node: &A11yNode, diagnostics: &mut Vec<Diagnostic>) {
-    if node.tag_name == "img" && node.alt_text.is_none() {
+    if node.resolved_tag_name == "img" && node.alt_text.is_none() {
         diagnostics.push(Diagnostic {
             code: "a11y::missing_alt".to_string(),
             message: "Image missing alt text.".to_string(),

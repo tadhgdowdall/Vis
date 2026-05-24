@@ -54,7 +54,8 @@ fn collect_control_labels(
     node: &ParsedNode,
     labels_by_control_id: &mut HashMap<String, String>,
 ) {
-    if node.tag_name.eq_ignore_ascii_case("label") {
+    let resolved = resolve_element(&node.tag_name.to_ascii_lowercase());
+    if resolved == "label" {
         let label_text = normalize_text(&node.text());
 
         if !label_text.is_empty() {
@@ -78,6 +79,7 @@ fn analyze_node(
     context: &AnalysisContext,
 ) -> A11yNode {
     let tag_name = node.tag_name.to_ascii_lowercase();
+    let resolved_tag = resolve_element(&tag_name);
     let input_type = node
         .attribute_value("type")
         .map(|value| value.to_ascii_lowercase());
@@ -93,7 +95,7 @@ fn analyze_node(
     let text_content = normalize_text(&node.text());
     let alt_text = node.attribute_value("alt").map(normalize_text);
 
-    let child_wrapping_label: Option<String> = if tag_name == "label" {
+    let child_wrapping_label: Option<String> = if resolved_tag == "label" {
         let label_text = normalize_text(&node.text());
         if !label_text.is_empty() {
             Some(label_text)
@@ -106,18 +108,18 @@ fn analyze_node(
     let child_wrapping_label: Option<&str> = child_wrapping_label.as_deref();
 
     let interactive = matches!(
-        tag_name.as_str(),
+        resolved_tag.as_str(),
         "button" | "input" | "select" | "textarea"
-    ) || (tag_name == "a" && href.is_some())
+    ) || (resolved_tag == "a" && href.is_some())
         || has_click_handler;
 
     let focusable = matches!(
-        tag_name.as_str(),
+        resolved_tag.as_str(),
         "button" | "input" | "select" | "textarea"
-    ) || (tag_name == "a" && href.is_some())
+    ) || (resolved_tag == "a" && href.is_some())
         || tab_index.is_some_and(|value| value.trim() != "-1");
 
-    let accessible_name = match tag_name.as_str() {
+    let accessible_name = match resolved_tag.as_str() {
         "button" => (!text_content.is_empty())
             .then_some(text_content.clone())
             .or_else(|| accessible_name_from_references(aria_labelledby, context))
@@ -149,6 +151,7 @@ fn analyze_node(
 
     A11yNode {
         tag_name,
+        resolved_tag_name: resolved_tag,
         href: href.map(str::to_string),
         input_type,
         interactive,
@@ -223,7 +226,8 @@ fn collect_descendant_image_alt_text(node: &ParsedNode) -> Vec<String> {
     let mut labels = Vec::new();
 
     for child in &node.children {
-        if child.tag_name == "img"
+        let resolved = resolve_element(&child.tag_name.to_ascii_lowercase());
+        if resolved == "img"
             && let Some(alt_text) = child.attribute_value("alt")
         {
             let normalized = normalize_text(alt_text);
@@ -250,6 +254,59 @@ fn native_label_for_control(
     }
 
     wrapping_label.map(str::to_string)
+}
+
+fn resolve_element(component: &str) -> String {
+    if matches!(
+        component,
+        "button"
+            | "input"
+            | "a"
+            | "img"
+            | "select"
+            | "textarea"
+            | "label"
+            | "div"
+            | "span"
+            | "main"
+            | "nav"
+            | "header"
+            | "footer"
+            | "section"
+            | "article"
+            | "aside"
+            | "form"
+            | "p"
+            | "h1"
+            | "h2"
+            | "h3"
+            | "h4"
+            | "h5"
+            | "h6"
+            | "ul"
+            | "ol"
+            | "li"
+            | "table"
+            | "tr"
+            | "td"
+            | "th"
+            | "br"
+            | "hr"
+    ) {
+        return component.to_string();
+    }
+
+    match component {
+        "btn" | "iconbutton" | "closebutton" | "togglebutton" | "menubutton" => "button",
+        "textfield" | "textinput" | "searchinput" => "input",
+        "link" | "navlink" | "hyperlink" | "skiplink" => "a",
+        "image" | "picture" | "avatar" | "thumbnail" => "img",
+        "dropdown" | "combobox" | "multiselect" => "select",
+        "textbox" | "richtext" => "textarea",
+        "formlabel" | "fieldlabel" => "label",
+        _ => component,
+    }
+    .to_string()
 }
 
 fn normalize_text(value: &str) -> String {

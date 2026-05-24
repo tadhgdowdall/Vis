@@ -2,7 +2,7 @@ use vis_diagnostics::Diagnostic;
 use vis_ir::A11yNode;
 
 pub fn check(file_path: &str, node: &A11yNode, diagnostics: &mut Vec<Diagnostic>) {
-    if node.tag_name == "a"
+    if node.resolved_tag_name == "a"
         && node.href.is_some()
         && node
             .accessible_name

@@ -2,7 +2,7 @@ use vis_diagnostics::Diagnostic;
 use vis_ir::A11yNode;
 
 pub fn check(file_path: &str, node: &A11yNode, diagnostics: &mut Vec<Diagnostic>) {
-    if matches!(node.tag_name.as_str(), "div" | "span") && node.has_click_handler && !node.focusable
+    if matches!(node.resolved_tag_name.as_str(), "div" | "span") && node.has_click_handler && !node.focusable
     {
         diagnostics.push(Diagnostic {
             code: "a11y::clickable_div".to_string(),
