@@ -15,6 +15,7 @@ pub mod tabindex_misuse;
 pub mod title_label;
 
 use crate::RuleFn;
+use vis_diagnostics::Severity;
 
 pub const ALL: &[RuleFn] = &[
     img_alt::check,
@@ -32,4 +33,22 @@ pub const ALL: &[RuleFn] = &[
     placeholder_label::check,
     form_no_submit::check,
     title_label::check,
+];
+
+pub const DEFAULT_SEVERITIES: &[(&str, Severity)] = &[
+    ("a11y::missing_alt", Severity::Error),
+    ("a11y::heading_hierarchy", Severity::Error),
+    ("a11y::html_lang", Severity::Error),
+    ("a11y::page_title", Severity::Error),
+    ("a11y::link_label", Severity::Error),
+    ("a11y::link_semantics", Severity::Error),
+    ("a11y::tabindex_misuse", Severity::Error),
+    ("a11y::clickable_div", Severity::Error),
+    ("a11y::button_label", Severity::Error),
+    ("a11y::form_control_label", Severity::Error),
+    ("a11y::autocomplete", Severity::Error),
+    ("a11y::empty_heading", Severity::Warning),
+    ("a11y::placeholder_label", Severity::Warning),
+    ("a11y::form_no_submit", Severity::Warning),
+    ("a11y::title_label", Severity::Warning),
 ];

@@ -2,9 +2,9 @@ use std::collections::{BTreeMap, HashMap};
 use std::{fs, path::Path, process};
 
 use vis_analyzer::analyze_with_map;
-use vis_diagnostics::{Diagnostic, render_diagnostic, render_diagnostics_json};
+use vis_diagnostics::{Diagnostic, Severity, render_diagnostic, render_diagnostics_json};
 use vis_parser::{parse_html, parse_jsx};
-use vis_rules::run_all;
+use vis_rules::run_all_with_config;
 use walkdir::WalkDir;
 
 use crate::config::Config;
@@ -62,12 +62,13 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<i32, CliError> {
 
     let config = Config::load().unwrap_or_default();
 
-    check_targets(&paths, &config.components, json)
+    check_targets(&paths, &config.components, &config.rules, json)
 }
 
 fn check_targets(
     paths: &[String],
     component_map: &HashMap<String, String>,
+    rule_config: &HashMap<String, Severity>,
     json: bool,
 ) -> Result<i32, CliError> {
     let mut files_checked = 0usize;
@@ -86,12 +87,13 @@ fn check_targets(
             scan_directory(
                 path,
                 component_map,
+                rule_config,
                 &mut files_checked,
                 &mut reports,
                 &mut error_count,
             );
         } else if path.is_file() {
-            match check_file(path, component_map) {
+            match check_file(path, component_map, rule_config) {
                 Ok((source, diagnostics)) => {
                     files_checked += 1;
                     if !diagnostics.is_empty() {
@@ -200,6 +202,7 @@ fn print_summary(reports: &[FileReport]) {
 fn check_file(
     path: &Path,
     component_map: &HashMap<String, String>,
+    rule_config: &HashMap<String, Severity>,
 ) -> Result<(String, Vec<Diagnostic>), String> {
     let source = fs::read_to_string(path).map_err(|e| format!("{e}"))?;
 
@@ -217,7 +220,7 @@ fn check_file(
     };
 
     let analyzed = analyze_with_map(&parsed, map);
-    let diagnostics = run_all(&path.to_string_lossy(), &analyzed);
+    let diagnostics = run_all_with_config(&path.to_string_lossy(), &analyzed, rule_config);
 
     Ok((source, diagnostics))
 }
@@ -225,6 +228,7 @@ fn check_file(
 fn scan_directory(
     dir: &Path,
     component_map: &HashMap<String, String>,
+    rule_config: &HashMap<String, Severity>,
     files_checked: &mut usize,
     reports: &mut Vec<FileReport>,
     error_count: &mut usize,
@@ -256,7 +260,7 @@ fn scan_directory(
             continue;
         }
 
-        match check_file(path, component_map) {
+        match check_file(path, component_map, rule_config) {
             Ok((source, diagnostics)) => {
                 *files_checked += 1;
                 if !diagnostics.is_empty() {

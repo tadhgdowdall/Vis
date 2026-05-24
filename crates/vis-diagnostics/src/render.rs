@@ -16,7 +16,8 @@ pub fn render_diagnostic(diagnostic: &Diagnostic, source: &str) -> String {
     let marker = format!("{caret_padding}{caret}");
 
     let mut rendered = format!(
-        "error[{}]\n --> {}:{}:{}\n\n{}\n\n{}\n{}",
+        "{}[{}]\n --> {}:{}:{}\n\n{}\n\n{}\n{}",
+        diagnostic.severity.label(),
         diagnostic.code,
         diagnostic.file_path,
         position.line,

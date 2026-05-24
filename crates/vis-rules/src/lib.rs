@@ -1,16 +1,47 @@
 pub mod rules;
 
-use vis_diagnostics::Diagnostic;
+use std::collections::HashMap;
+
+use vis_diagnostics::{Diagnostic, Severity};
 use vis_ir::A11yNode;
 
 type RuleFn = fn(&str, &A11yNode, &mut Vec<Diagnostic>);
 
 pub fn run_all(file_path: &str, nodes: &[A11yNode]) -> Vec<Diagnostic> {
+    run_all_with_config(file_path, nodes, &HashMap::new())
+}
+
+pub fn run_all_with_config(
+    file_path: &str,
+    nodes: &[A11yNode],
+    rule_config: &HashMap<String, Severity>,
+) -> Vec<Diagnostic> {
+    let default_severities: &[(&str, Severity)] = rules::DEFAULT_SEVERITIES;
+
+    let effective_severities: HashMap<&str, Severity> = default_severities
+        .iter()
+        .map(|&(code, default)| {
+            let severity = rule_config.get(code).copied().unwrap_or(default);
+            (code, severity)
+        })
+        .collect();
+
     let mut diagnostics = Vec::new();
 
     for node in nodes {
-        for rule in rules::ALL {
+        for (i, rule) in rules::ALL.iter().enumerate() {
+            if let Some(&(code, _)) = default_severities.get(i)
+                && !effective_severities[code].is_enabled()
+            {
+                continue;
+            }
             rule(file_path, node, &mut diagnostics);
+        }
+    }
+
+    for diagnostic in &mut diagnostics {
+        if let Some(&severity) = effective_severities.get(diagnostic.code.as_str()) {
+            diagnostic.severity = severity;
         }
     }
 

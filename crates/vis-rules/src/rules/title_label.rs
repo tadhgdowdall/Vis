@@ -1,4 +1,4 @@
-use vis_diagnostics::Diagnostic;
+use vis_diagnostics::{Diagnostic, Severity};
 use vis_ir::A11yNode;
 
 pub fn check(file_path: &str, node: &A11yNode, diagnostics: &mut Vec<Diagnostic>) {
@@ -15,6 +15,7 @@ pub fn check(file_path: &str, node: &A11yNode, diagnostics: &mut Vec<Diagnostic>
                     .to_string(),
             ),
             file_path: file_path.to_string(),
+            severity: Severity::Warning,
             span: node.span,
         });
     }

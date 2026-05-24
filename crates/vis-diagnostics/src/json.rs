@@ -1,10 +1,11 @@
 use serde::Serialize;
 
-use crate::{Diagnostic, position_for_offset};
+use crate::{Diagnostic, Severity, position_for_offset};
 
 #[derive(Serialize)]
 struct DiagnosticOutput {
     code: String,
+    severity: Severity,
     message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     help: Option<String>,
@@ -24,6 +25,7 @@ pub fn render_diagnostics_json<'a>(
                 let position = position_for_offset(source, d.span.start);
                 DiagnosticOutput {
                     code: d.code.clone(),
+                    severity: d.severity,
                     message: d.message.clone(),
                     help: d.help.clone(),
                     file: d.file_path.clone(),
