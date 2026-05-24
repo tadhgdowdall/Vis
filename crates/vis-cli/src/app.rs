@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::{fs, path::Path, process};
 
 use vis_analyzer::analyze_with_map;
-use vis_diagnostics::{Diagnostic, render_diagnostic};
+use vis_diagnostics::{Diagnostic, render_diagnostic, render_diagnostics_json};
 use vis_parser::{parse_html, parse_jsx};
 use vis_rules::run_all;
 use walkdir::WalkDir;
@@ -43,7 +43,17 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<i32, CliError> {
         return Err(CliError::Usage);
     }
 
-    let paths: Vec<String> = args.collect();
+    let mut json = false;
+    let mut paths: Vec<String> = Vec::new();
+
+    for arg in args {
+        if arg == "--json" {
+            json = true;
+        } else {
+            paths.push(arg);
+        }
+    }
+
     let paths = if paths.is_empty() {
         vec![".".to_string()]
     } else {
@@ -52,12 +62,13 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<i32, CliError> {
 
     let config = Config::load().unwrap_or_default();
 
-    check_targets(&paths, &config.components)
+    check_targets(&paths, &config.components, json)
 }
 
 fn check_targets(
     paths: &[String],
     component_map: &HashMap<String, String>,
+    json: bool,
 ) -> Result<i32, CliError> {
     let mut files_checked = 0usize;
     let mut reports: Vec<FileReport> = Vec::new();
@@ -105,27 +116,46 @@ fn check_targets(
 
     let total_issues: usize = reports.iter().map(|r| r.diagnostics.len()).sum();
 
-    if total_issues > 0 {
-        print_summary(&reports);
-        println!();
-    }
-
-    for report in &reports {
-        for diagnostic in &report.diagnostics {
-            println!("{}", render_diagnostic(diagnostic, &report.source));
+    if json {
+        let source_diag_pairs: Vec<(&str, &[Diagnostic])> = reports
+            .iter()
+            .map(|r| (r.source.as_str(), r.diagnostics.as_slice()))
+            .collect();
+        let json_output = render_diagnostics_json(&source_diag_pairs);
+        println!("{json_output}");
+    } else {
+        if total_issues > 0 {
+            print_summary(&reports);
             println!();
+        }
+
+        for report in &reports {
+            for diagnostic in &report.diagnostics {
+                println!("{}", render_diagnostic(diagnostic, &report.source));
+                println!();
+            }
         }
     }
 
     println!();
     if total_issues > 0 {
-        println!(
-            "{} file{} scanned, {} issue{} found",
-            files_checked,
-            if files_checked == 1 { "" } else { "s" },
-            total_issues,
-            if total_issues == 1 { "" } else { "s" },
-        );
+        if json {
+            eprintln!(
+                "{} file{} scanned, {} issue{} found",
+                files_checked,
+                if files_checked == 1 { "" } else { "s" },
+                total_issues,
+                if total_issues == 1 { "" } else { "s" },
+            );
+        } else {
+            println!(
+                "{} file{} scanned, {} issue{} found",
+                files_checked,
+                if files_checked == 1 { "" } else { "s" },
+                total_issues,
+                if total_issues == 1 { "" } else { "s" },
+            );
+        }
         Ok(1)
     } else {
         println!(
