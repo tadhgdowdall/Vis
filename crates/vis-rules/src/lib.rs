@@ -175,4 +175,63 @@ mod tests {
                 .all(|diagnostic| diagnostic.code != "a11y::link_semantics")
         );
     }
+
+    #[test]
+    fn emits_diagnostic_for_link_without_accessible_name() {
+        let parsed = parse_html(r#"<a href="/reports"><img src="/icon.png" /></a>"#)
+            .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "a11y::link_label")
+        );
+    }
+
+    #[test]
+    fn does_not_emit_diagnostic_for_link_named_by_image_alt_text() {
+        let parsed =
+            parse_html(r#"<a href="/reports"><img src="/icon.png" alt="View reports" /></a>"#)
+                .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(
+            diagnostics
+                .iter()
+                .all(|diagnostic| diagnostic.code != "a11y::link_label")
+        );
+    }
+
+    #[test]
+    fn does_not_emit_button_diagnostic_for_submit_input_without_explicit_value() {
+        let parsed = parse_html(r#"<input type="submit" />"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(
+            diagnostics
+                .iter()
+                .all(|diagnostic| diagnostic.code != "a11y::button_label")
+        );
+    }
+
+    #[test]
+    fn emits_button_diagnostic_for_input_button_without_name() {
+        let parsed = parse_html(r#"<input type="button" />"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "a11y::button_label")
+        );
+    }
 }

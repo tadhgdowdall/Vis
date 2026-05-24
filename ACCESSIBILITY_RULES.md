@@ -97,6 +97,8 @@ Examples that should pass:
 ```html
 <button>Save</button>
 <button aria-label="Close">X</button>
+<input type="submit">
+<input type="image" src="/search.png" alt="Search">
 ```
 
 Examples that should fail:
@@ -110,6 +112,7 @@ Notes:
 
 - This is an accessible-name rule, not an ARIA rule.
 - `vis` should report “missing accessible name”, not “missing aria-label”.
+- Native button-like inputs also count here. For example, `input type="submit"` and `input type="reset"` have native naming behavior, while `input type="button"` still needs a usable label.
 
 ### Rule: Interactive non-native elements must not fake buttons poorly
 
@@ -223,6 +226,42 @@ Actions should use `<button>`.
 Notes:
 
 - This is important semantically, but may be better as a later rule because intent is not always statically obvious.
+
+### Rule: Links must have accessible names
+
+Applies to:
+
+- `<a href="...">`
+
+Requirement:
+
+Links must have a non-empty accessible name that communicates destination or purpose.
+
+Valid name sources can include:
+
+- visible link text
+- `aria-label`
+- `aria-labelledby`
+- meaningful `alt` text when the link contains only an image
+
+Examples that should pass:
+
+```html
+<a href="/reports">View reports</a>
+<a href="/reports"><img src="/reports.png" alt="View reports"></a>
+```
+
+Examples that should fail:
+
+```html
+<a href="/reports"><img src="/reports.png"></a>
+<a href="/reports"></a>
+```
+
+Notes:
+
+- This aligns with WCAG name requirements and common failures for image-only links.
+- For image-only links, the image alt text should describe the link purpose, not just the picture.
 
 ## What `vis` Should Not Enforce
 
