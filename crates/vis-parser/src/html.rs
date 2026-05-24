@@ -10,7 +10,9 @@ pub fn parse_html(source: &str) -> Result<Vec<ParsedNode>, ParseError> {
     let has_explicit_html = source.to_ascii_lowercase().contains("<html");
 
     if has_explicit_html {
-        return Ok(vec![convert_element(root, source)]);
+        let mut nodes = vec![convert_element(root, source)];
+        annotate_spans(source, &mut nodes);
+        return Ok(nodes);
     }
 
     let body = root
@@ -19,7 +21,8 @@ pub fn parse_html(source: &str) -> Result<Vec<ParsedNode>, ParseError> {
         .find(|el| el.value().name.local.as_ref().eq_ignore_ascii_case("body"));
 
     let container = body.unwrap_or(root);
-    let nodes = convert_children(container, source);
+    let mut nodes = convert_children(container, source);
+    annotate_spans(source, &mut nodes);
     Ok(nodes)
 }
 
@@ -83,6 +86,153 @@ fn convert_element(el: ElementRef, source: &str) -> ParsedNode {
         },
         children,
     }
+}
+
+fn annotate_spans(source: &str, nodes: &mut [ParsedNode]) {
+    let mut cursor = 0usize;
+    for node in nodes {
+        cursor = annotate_node(source, node, cursor);
+    }
+}
+
+fn annotate_node(source: &str, node: &mut ParsedNode, cursor: usize) -> usize {
+    if node.tag_name.is_empty() {
+        return cursor;
+    }
+
+    let tag_lower = node.tag_name.as_str();
+    let open_start = find_open_tag(source, tag_lower, cursor);
+    let open_end = skip_tag_content(source, open_start + 1 + tag_lower.len());
+
+    if is_self_closing(source, open_start, open_end) || is_void_element(tag_lower) {
+        node.span = Span {
+            start: open_start,
+            end: open_end,
+        };
+        return open_end;
+    }
+
+    let mut pos = open_end;
+    for child in &mut node.children {
+        pos = annotate_node(source, child, pos);
+    }
+
+    let close_end = find_close_tag(source, tag_lower, pos);
+    node.span = Span {
+        start: open_start,
+        end: close_end,
+    };
+
+    close_end
+}
+
+fn find_open_tag(source: &str, tag_name: &str, mut pos: usize) -> usize {
+    let bytes = source.as_bytes();
+    let len = bytes.len();
+
+    while pos < len {
+        if bytes[pos] == b'<' && pos + 1 < len {
+            let after_lt = &source[pos + 1..];
+            if after_lt
+                .to_ascii_lowercase()
+                .starts_with(&tag_name.to_ascii_lowercase())
+            {
+                let after_tag = &after_lt[tag_name.len()..];
+                if after_tag.is_empty()
+                    || after_tag.as_bytes()[0].is_ascii_whitespace()
+                    || after_tag.as_bytes()[0] == b'>'
+                    || after_tag.as_bytes()[0] == b'/'
+                {
+                    return pos;
+                }
+            }
+        }
+        pos += 1;
+    }
+
+    pos
+}
+
+fn skip_tag_content(source: &str, mut pos: usize) -> usize {
+    let bytes = source.as_bytes();
+    let len = bytes.len();
+
+    while pos < len {
+        match bytes[pos] {
+            b'>' => return pos + 1,
+            b'\'' | b'"' => {
+                let quote = bytes[pos];
+                pos += 1;
+                while pos < len && bytes[pos] != quote {
+                    pos += 1;
+                }
+                pos += 1;
+            }
+            _ => pos += 1,
+        }
+    }
+
+    pos
+}
+
+fn is_self_closing(source: &str, _open_start: usize, open_end: usize) -> bool {
+    open_end >= 3
+        && &source.as_bytes()[open_end - 2..open_end] == b"/>"
+        && !matches!(
+            source.as_bytes().get(open_end - 3),
+            Some(b'=' | b'"' | b'\'')
+        )
+}
+
+fn is_void_element(tag: &str) -> bool {
+    matches!(
+        tag,
+        "area"
+            | "base"
+            | "br"
+            | "col"
+            | "embed"
+            | "hr"
+            | "img"
+            | "input"
+            | "link"
+            | "meta"
+            | "param"
+            | "source"
+            | "track"
+            | "wbr"
+    )
+}
+
+fn find_close_tag(source: &str, tag_name: &str, mut pos: usize) -> usize {
+    let bytes = source.as_bytes();
+    let len = bytes.len();
+    let close_pattern = format!("</{}", tag_name);
+
+    while pos < len {
+        if bytes[pos] == b'<' && pos + 1 < len && bytes[pos + 1] == b'/' {
+            let suffix = &source[pos..];
+            if suffix
+                .to_ascii_lowercase()
+                .starts_with(&close_pattern.to_ascii_lowercase())
+            {
+                let after_tag = &suffix[close_pattern.len()..];
+                if after_tag.is_empty()
+                    || after_tag.as_bytes()[0].is_ascii_whitespace()
+                    || after_tag.as_bytes()[0] == b'>'
+                {
+                    let mut close_end = pos + close_pattern.len();
+                    while close_end < len && bytes[close_end] != b'>' {
+                        close_end += 1;
+                    }
+                    return close_end + 1;
+                }
+            }
+        }
+        pos += 1;
+    }
+
+    len
 }
 
 fn normalize_whitespace(value: &str) -> String {
