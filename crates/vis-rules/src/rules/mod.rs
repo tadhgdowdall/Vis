@@ -1,3 +1,4 @@
+pub mod aria_data;
 pub mod autocomplete;
 pub mod button_label;
 pub mod clickable_div;
@@ -7,10 +8,13 @@ pub mod form_no_submit;
 pub mod heading_hierarchy;
 pub mod html_lang;
 pub mod img_alt;
+pub mod invalid_aria;
+pub mod invalid_role;
 pub mod link_label;
 pub mod link_semantics;
 pub mod page_title;
 pub mod placeholder_label;
+pub mod redundant_role;
 pub mod tabindex_misuse;
 pub mod title_label;
 
@@ -33,6 +37,9 @@ pub const ALL: &[RuleFn] = &[
     placeholder_label::check,
     form_no_submit::check,
     title_label::check,
+    invalid_aria::check,
+    invalid_role::check,
+    redundant_role::check,
 ];
 
 pub const DEFAULT_SEVERITIES: &[(&str, Severity)] = &[
@@ -51,4 +58,7 @@ pub const DEFAULT_SEVERITIES: &[(&str, Severity)] = &[
     ("a11y::placeholder_label", Severity::Warning),
     ("a11y::form_no_submit", Severity::Warning),
     ("a11y::title_label", Severity::Warning),
+    ("a11y::invalid_aria", Severity::Error),
+    ("a11y::invalid_role", Severity::Error),
+    ("a11y::redundant_role", Severity::Warning),
 ];

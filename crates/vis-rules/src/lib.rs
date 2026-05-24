@@ -553,4 +553,66 @@ mod tests {
 
         assert!(diagnostics.iter().all(|d| d.code != "a11y::form_no_submit"));
     }
+
+    #[test]
+    fn flags_invalid_aria_attribute() {
+        let parsed = parse_html(r#"<div aria-labeledby="x"></div>"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().any(|d| d.code == "a11y::invalid_aria"));
+    }
+
+    #[test]
+    fn allows_valid_aria_attribute() {
+        let parsed = parse_html(r#"<div aria-labelledby="x"></div>"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::invalid_aria"));
+    }
+
+    #[test]
+    fn flags_invalid_role() {
+        let parsed = parse_html(r#"<span role="buton"></span>"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().any(|d| d.code == "a11y::invalid_role"));
+    }
+
+    #[test]
+    fn allows_valid_role() {
+        let parsed = parse_html(r#"<span role="button"></span>"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::invalid_role"));
+    }
+
+    #[test]
+    fn flags_redundant_role_on_native_element() {
+        let parsed =
+            parse_html(r#"<button role="button">Save</button>"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().any(|d| d.code == "a11y::redundant_role"));
+    }
+
+    #[test]
+    fn allows_non_native_role_on_element() {
+        let parsed =
+            parse_html(r#"<button role="switch">Toggle</button>"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(diagnostics.iter().all(|d| d.code == "a11y::redundant_role"));
+    }
 }

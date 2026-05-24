@@ -18,6 +18,8 @@ pub struct A11yNode {
     pub placeholder: Option<String>,
     pub title_attr: Option<String>,
     pub has_submit_handler: bool,
+    pub role: Option<String>,
+    pub aria_attrs: Vec<String>,
     pub span: Span,
     pub children: Vec<A11yNode>,
 }

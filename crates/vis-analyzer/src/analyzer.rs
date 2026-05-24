@@ -111,6 +111,14 @@ fn analyze_node(
     let autocomplete = node.attribute_value("autocomplete");
     let placeholder = node.attribute_value("placeholder").map(normalize_text);
     let title_attr = node.attribute_value("title").map(normalize_text);
+    let role = node.attribute_value("role").map(|v| v.to_ascii_lowercase());
+    let aria_attrs: Vec<String> = node
+        .attributes
+        .iter()
+        .map(|attr| &attr.name)
+        .filter(|name| name.to_ascii_lowercase().starts_with("aria-"))
+        .map(|name| name.to_ascii_lowercase())
+        .collect();
     let has_submit_handler = node
         .attributes
         .iter()
@@ -188,6 +196,8 @@ fn analyze_node(
         placeholder,
         title_attr,
         has_submit_handler,
+        role,
+        aria_attrs,
         span: node.span,
         children: node
             .children
