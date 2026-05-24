@@ -1,8 +1,8 @@
 use std::{fs, path::Path, process};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use vis_analyzer::analyze_with_map;
-use vis_diagnostics::render_diagnostic;
+use vis_diagnostics::{Diagnostic, render_diagnostic};
 use vis_parser::{parse_html, parse_jsx};
 use vis_rules::run_all;
 use walkdir::WalkDir;
@@ -27,6 +27,12 @@ const SKIP_DIRS: &[&str] = &[
 
 const SUPPORTED_EXTS: &[&str] = &["html", "jsx", "tsx", "js"];
 
+struct FileReport {
+    _path: String,
+    source: String,
+    diagnostics: Vec<Diagnostic>,
+}
+
 pub fn run(args: impl IntoIterator<Item = String>) -> Result<i32, CliError> {
     let mut args = args.into_iter();
     let Some(command) = args.next() else {
@@ -49,9 +55,12 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<i32, CliError> {
     check_targets(&paths, &config.components)
 }
 
-fn check_targets(paths: &[String], component_map: &HashMap<String, String>) -> Result<i32, CliError> {
+fn check_targets(
+    paths: &[String],
+    component_map: &HashMap<String, String>,
+) -> Result<i32, CliError> {
     let mut files_checked = 0usize;
-    let mut issues_found = 0usize;
+    let mut reports: Vec<FileReport> = Vec::new();
     let mut error_count = 0usize;
 
     for path_str in paths {
@@ -63,12 +72,24 @@ fn check_targets(paths: &[String], component_map: &HashMap<String, String>) -> R
         }
 
         if path.is_dir() {
-            scan_directory(path, component_map, &mut files_checked, &mut issues_found, &mut error_count);
+            scan_directory(
+                path,
+                component_map,
+                &mut files_checked,
+                &mut reports,
+                &mut error_count,
+            );
         } else if path.is_file() {
             match check_file(path, component_map) {
-                Ok(n) => {
+                Ok((source, diagnostics)) => {
                     files_checked += 1;
-                    issues_found += n;
+                    if !diagnostics.is_empty() {
+                        reports.push(FileReport {
+                            _path: path.to_string_lossy().into(),
+                            source,
+                            diagnostics,
+                        });
+                    }
                 }
                 Err(e) => {
                     eprintln!("error: {}: {}", path.display(), e);
@@ -82,14 +103,28 @@ fn check_targets(paths: &[String], component_map: &HashMap<String, String>) -> R
         return Err(CliError::NoTargets);
     }
 
+    let total_issues: usize = reports.iter().map(|r| r.diagnostics.len()).sum();
+
+    if total_issues > 0 {
+        print_summary(&reports);
+        println!();
+    }
+
+    for report in &reports {
+        for diagnostic in &report.diagnostics {
+            println!("{}", render_diagnostic(diagnostic, &report.source));
+            println!();
+        }
+    }
+
     println!();
-    if issues_found > 0 {
+    if total_issues > 0 {
         println!(
             "{} file{} scanned, {} issue{} found",
             files_checked,
             if files_checked == 1 { "" } else { "s" },
-            issues_found,
-            if issues_found == 1 { "" } else { "s" },
+            total_issues,
+            if total_issues == 1 { "" } else { "s" },
         );
         Ok(1)
     } else {
@@ -102,7 +137,40 @@ fn check_targets(paths: &[String], component_map: &HashMap<String, String>) -> R
     }
 }
 
-fn check_file(path: &Path, component_map: &HashMap<String, String>) -> Result<usize, String> {
+fn print_summary(reports: &[FileReport]) {
+    let mut by_code: BTreeMap<&str, usize> = BTreeMap::new();
+
+    for report in reports {
+        for diagnostic in &report.diagnostics {
+            *by_code.entry(&diagnostic.code).or_default() += 1;
+        }
+    }
+
+    let mut entries: Vec<(&str, usize)> = by_code.into_iter().collect();
+    entries.sort_by_key(|(code, count)| (std::cmp::Reverse(*count), *code));
+
+    let max_width = entries
+        .iter()
+        .map(|(code, _)| code.len())
+        .max()
+        .unwrap_or(0);
+
+    for (code, count) in &entries {
+        let label = if *count == 1 { "issue " } else { "issues" };
+        println!(
+            "  {:<width$} {:>4} {}",
+            code,
+            count,
+            label,
+            width = max_width
+        );
+    }
+}
+
+fn check_file(
+    path: &Path,
+    component_map: &HashMap<String, String>,
+) -> Result<(String, Vec<Diagnostic>), String> {
     let source = fs::read_to_string(path).map_err(|e| format!("{e}"))?;
 
     let parsed = match path.extension().and_then(|e| e.to_str()) {
@@ -121,19 +189,14 @@ fn check_file(path: &Path, component_map: &HashMap<String, String>) -> Result<us
     let analyzed = analyze_with_map(&parsed, map);
     let diagnostics = run_all(&path.to_string_lossy(), &analyzed);
 
-    for diagnostic in &diagnostics {
-        println!("{}", render_diagnostic(diagnostic, &source));
-        println!();
-    }
-
-    Ok(diagnostics.len())
+    Ok((source, diagnostics))
 }
 
 fn scan_directory(
     dir: &Path,
     component_map: &HashMap<String, String>,
     files_checked: &mut usize,
-    issues_found: &mut usize,
+    reports: &mut Vec<FileReport>,
     error_count: &mut usize,
 ) {
     let walker = WalkDir::new(dir)
@@ -166,9 +229,15 @@ fn scan_directory(
         }
 
         match check_file(path, component_map) {
-            Ok(n) => {
+            Ok((source, diagnostics)) => {
                 *files_checked += 1;
-                *issues_found += n;
+                if !diagnostics.is_empty() {
+                        reports.push(FileReport {
+                            _path: path.to_string_lossy().into(),
+                            source,
+                            diagnostics,
+                        });
+                }
             }
             Err(e) => {
                 eprintln!("error: {}: {}", path.display(), e);
