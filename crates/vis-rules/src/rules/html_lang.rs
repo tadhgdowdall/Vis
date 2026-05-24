@@ -30,14 +30,12 @@ pub fn check(file_path: &str, node: &A11yNode, diagnostics: &mut Vec<Diagnostic>
                     span: node.span,
                 });
             }
-            Some(lang)
-                if !lang
-                    .chars()
-                    .any(|c| VALID_LANG_PATTERN.contains(c)) =>
-            {
+            Some(lang) if !lang.chars().any(|c| VALID_LANG_PATTERN.contains(c)) => {
                 diagnostics.push(Diagnostic {
                     code: "a11y::html_lang".to_string(),
-                    message: format!("The lang attribute \"{lang}\" does not look like a valid language code."),
+                    message: format!(
+                        "The lang attribute \"{lang}\" does not look like a valid language code."
+                    ),
                     help: Some(
                         "Use a valid BCP 47 language tag, e.g. \"en\", \"fr\", \"ja\", \"en-US\"."
                             .to_string(),

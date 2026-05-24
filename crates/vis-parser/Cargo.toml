@@ -3,6 +3,9 @@ name = "vis-parser"
 version.workspace = true
 edition.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 vis-diagnostics = { path = "../vis-diagnostics" }
 swc_common = "21.0.2"

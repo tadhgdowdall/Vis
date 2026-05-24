@@ -1,9 +1,9 @@
-use swc_common::{sync::Lrc, FileName, SourceMap, Spanned};
+use swc_common::{FileName, SourceMap, Spanned, sync::Lrc};
 use swc_ecma_ast::{
     EsVersion, JSXAttrName, JSXAttrOrSpread, JSXAttrValue, JSXElement, JSXElementChild,
     JSXElementName, JSXExpr, JSXFragment, JSXText, Str,
 };
-use swc_ecma_parser::{parse_file_as_module, Syntax, TsSyntax};
+use swc_ecma_parser::{Syntax, TsSyntax, parse_file_as_module};
 use swc_ecma_visit::{Visit, VisitWith};
 
 use crate::{Attribute, ParseError, ParsedNode};
@@ -349,7 +349,10 @@ mod tests {
         let source = r#"<div className={styles.container} />"#;
         let nodes = parse_tsx(source).expect("tsx should parse");
 
-        assert_eq!(nodes[0].attribute_value("className"), Some("styles.container"));
+        assert_eq!(
+            nodes[0].attribute_value("className"),
+            Some("styles.container")
+        );
     }
 
     #[test]

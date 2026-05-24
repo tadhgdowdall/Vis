@@ -72,13 +72,12 @@ fn collect_control_labels(
     if resolved == "label" {
         let label_text = normalize_text(&node.text());
 
-        if !label_text.is_empty() {
-            if let Some(target_id) = node
+        if !label_text.is_empty()
+            && let Some(target_id) = node
                 .attribute_value("for")
                 .or_else(|| node.attribute_value("htmlFor"))
-            {
-                labels_by_control_id.insert(target_id.to_string(), label_text);
-            }
+        {
+            labels_by_control_id.insert(target_id.to_string(), label_text);
         }
     }
 
@@ -205,6 +204,7 @@ fn accessible_name_from_references(
     (!label.is_empty()).then_some(label)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn accessible_name_for_input(
     node: &ParsedNode,
     wrapping_label: Option<&str>,

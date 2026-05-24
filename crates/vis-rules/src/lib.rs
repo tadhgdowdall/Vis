@@ -237,8 +237,7 @@ mod tests {
 
     #[test]
     fn flags_positive_tabindex() {
-        let parsed =
-            parse_html(r#"<div tabindex="3">Focusable</div>"#).expect("html should parse");
+        let parsed = parse_html(r#"<div tabindex="3">Focusable</div>"#).expect("html should parse");
 
         let analyzed = analyze(&parsed);
         let diagnostics = run_all("example.html", &analyzed);
@@ -252,10 +251,8 @@ mod tests {
 
     #[test]
     fn allows_tabindex_zero_and_negative() {
-        let parsed = parse_html(
-            r#"<div tabindex="0">A</div><div tabindex="-1">B</div>"#,
-        )
-        .expect("html should parse");
+        let parsed = parse_html(r#"<div tabindex="0">A</div><div tabindex="-1">B</div>"#)
+            .expect("html should parse");
 
         let analyzed = analyze(&parsed);
         let diagnostics = run_all("example.html", &analyzed);
@@ -269,8 +266,7 @@ mod tests {
 
     #[test]
     fn flags_heading_skip_from_h1_to_h3() {
-        let parsed = parse_html("<main><h1>A</h1><h3>B</h3></main>")
-            .expect("html should parse");
+        let parsed = parse_html("<main><h1>A</h1><h3>B</h3></main>").expect("html should parse");
 
         let analyzed = analyze(&parsed);
         let diagnostics = run_all("example.html", &analyzed);
@@ -285,8 +281,7 @@ mod tests {
     #[test]
     fn allows_consecutive_headings() {
         let parsed =
-            parse_html("<main><h1>A</h1><h2>B</h2><h3>C</h3></main>")
-                .expect("html should parse");
+            parse_html("<main><h1>A</h1><h2>B</h2><h3>C</h3></main>").expect("html should parse");
 
         let analyzed = analyze(&parsed);
         let diagnostics = run_all("example.html", &analyzed);
@@ -300,8 +295,7 @@ mod tests {
 
     #[test]
     fn flags_first_heading_not_h1() {
-        let parsed = parse_html("<main><h2>Title</h2></main>")
-            .expect("html should parse");
+        let parsed = parse_html("<main><h2>Title</h2></main>").expect("html should parse");
 
         let analyzed = analyze(&parsed);
         let diagnostics = run_all("example.html", &analyzed);
@@ -321,11 +315,7 @@ mod tests {
         let analyzed = analyze(&parsed);
         let diagnostics = run_all("example.html", &analyzed);
 
-        assert!(
-            diagnostics
-                .iter()
-                .any(|d| d.code == "a11y::html_lang")
-        );
+        assert!(diagnostics.iter().any(|d| d.code == "a11y::html_lang"));
     }
 
     #[test]
@@ -336,11 +326,7 @@ mod tests {
         let analyzed = analyze(&parsed);
         let diagnostics = run_all("example.html", &analyzed);
 
-        assert!(
-            diagnostics
-                .iter()
-                .all(|d| d.code != "a11y::html_lang")
-        );
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::html_lang"));
     }
 
     #[test]
@@ -351,11 +337,7 @@ mod tests {
         let analyzed = analyze(&parsed);
         let diagnostics = run_all("example.html", &analyzed);
 
-        assert!(
-            diagnostics
-                .iter()
-                .any(|d| d.code == "a11y::html_lang")
-        );
+        assert!(diagnostics.iter().any(|d| d.code == "a11y::html_lang"));
     }
 
     #[test]
@@ -366,43 +348,28 @@ mod tests {
         let analyzed = analyze(&parsed);
         let diagnostics = run_all("example.html", &analyzed);
 
-        assert!(
-            diagnostics
-                .iter()
-                .any(|d| d.code == "a11y::page_title")
-        );
+        assert!(diagnostics.iter().any(|d| d.code == "a11y::page_title"));
     }
 
     #[test]
     fn allows_nonempty_title() {
-        let parsed = parse_html(
-            "<html><head><title>My Page</title></head><body></body></html>",
-        )
-        .expect("html should parse");
+        let parsed = parse_html("<html><head><title>My Page</title></head><body></body></html>")
+            .expect("html should parse");
 
         let analyzed = analyze(&parsed);
         let diagnostics = run_all("example.html", &analyzed);
 
-        assert!(
-            diagnostics
-                .iter()
-                .all(|d| d.code != "a11y::page_title")
-        );
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::page_title"));
     }
 
     #[test]
     fn flags_email_input_without_autocomplete() {
-        let parsed =
-            parse_html(r#"<input type="email" />"#).expect("html should parse");
+        let parsed = parse_html(r#"<input type="email" />"#).expect("html should parse");
 
         let analyzed = analyze(&parsed);
         let diagnostics = run_all("example.html", &analyzed);
 
-        assert!(
-            diagnostics
-                .iter()
-                .any(|d| d.code == "a11y::autocomplete")
-        );
+        assert!(diagnostics.iter().any(|d| d.code == "a11y::autocomplete"));
     }
 
     #[test]
@@ -413,25 +380,16 @@ mod tests {
         let analyzed = analyze(&parsed);
         let diagnostics = run_all("example.html", &analyzed);
 
-        assert!(
-            diagnostics
-                .iter()
-                .all(|d| d.code != "a11y::autocomplete")
-        );
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::autocomplete"));
     }
 
     #[test]
     fn allows_text_input_without_autocomplete() {
-        let parsed =
-            parse_html(r#"<input type="text" />"#).expect("html should parse");
+        let parsed = parse_html(r#"<input type="text" />"#).expect("html should parse");
 
         let analyzed = analyze(&parsed);
         let diagnostics = run_all("example.html", &analyzed);
 
-        assert!(
-            diagnostics
-                .iter()
-                .all(|d| d.code != "a11y::autocomplete")
-        );
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::autocomplete"));
     }
 }

@@ -3,5 +3,8 @@ name = "vis-ir"
 version.workspace = true
 edition.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 vis-diagnostics = { path = "../vis-diagnostics" }

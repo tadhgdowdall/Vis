@@ -12,3 +12,12 @@ members = [
 [workspace.package]
 edition = "2024"
 version = "0.1.0"
+rust-version = "1.85"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = "warn"
+dbg_macro = "warn"
+todo = "warn"

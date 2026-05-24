@@ -1,5 +1,5 @@
-use std::{fs, path::Path, process};
 use std::collections::{BTreeMap, HashMap};
+use std::{fs, path::Path, process};
 
 use vis_analyzer::analyze_with_map;
 use vis_diagnostics::{Diagnostic, render_diagnostic};
@@ -199,14 +199,12 @@ fn scan_directory(
     reports: &mut Vec<FileReport>,
     error_count: &mut usize,
 ) {
-    let walker = WalkDir::new(dir)
-        .into_iter()
-        .filter_entry(|e| {
-            !e.file_type().is_dir()
-                || e.file_name()
-                    .to_str()
-                    .is_none_or(|name| !SKIP_DIRS.contains(&name) && !name.starts_with('.'))
-        });
+    let walker = WalkDir::new(dir).into_iter().filter_entry(|e| {
+        !e.file_type().is_dir()
+            || e.file_name()
+                .to_str()
+                .is_none_or(|name| !SKIP_DIRS.contains(&name) && !name.starts_with('.'))
+    });
 
     for entry in walker {
         let entry = match entry {
@@ -232,11 +230,11 @@ fn scan_directory(
             Ok((source, diagnostics)) => {
                 *files_checked += 1;
                 if !diagnostics.is_empty() {
-                        reports.push(FileReport {
-                            _path: path.to_string_lossy().into(),
-                            source,
-                            diagnostics,
-                        });
+                    reports.push(FileReport {
+                        _path: path.to_string_lossy().into(),
+                        source,
+                        diagnostics,
+                    });
                 }
             }
             Err(e) => {
