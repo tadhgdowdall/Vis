@@ -32,32 +32,29 @@ fn convert_children(parent: ElementRef, source: &str) -> Vec<ParsedNode> {
 
     for child in parent.children() {
         if let Some(el) = ElementRef::wrap(child) {
-            flush_text(&mut text_buf, &mut result, source);
+            flush_text(&mut text_buf, &mut result);
             result.push(convert_element(el, source));
         } else if let Node::Text(text) = child.value() {
             text_buf.push_str(text);
         }
     }
-    flush_text(&mut text_buf, &mut result, source);
+    flush_text(&mut text_buf, &mut result);
 
     result
 }
 
-fn flush_text(text_buf: &mut String, result: &mut Vec<ParsedNode>, source: &str) {
-    let trimmed = normalize_whitespace(text_buf);
-    if !trimmed.is_empty() {
+fn flush_text(text_buf: &mut String, result: &mut Vec<ParsedNode>) {
+    let content = text_buf.trim().to_string();
+    if !content.is_empty() {
         result.push(ParsedNode {
             tag_name: String::new(),
             attributes: Vec::new(),
-            text_content: trimmed,
-            span: Span {
-                start: 0,
-                end: source.len(),
-            },
+            text_content: content,
+            span: Span { start: 0, end: 0 },
             children: Vec::new(),
         });
-        text_buf.clear();
     }
+    text_buf.clear();
 }
 
 fn convert_element(el: ElementRef, source: &str) -> ParsedNode {
@@ -80,10 +77,7 @@ fn convert_element(el: ElementRef, source: &str) -> ParsedNode {
         tag_name,
         attributes,
         text_content: String::new(),
-        span: Span {
-            start: 0,
-            end: source.len(),
-        },
+        span: Span { start: 0, end: 0 },
         children,
     }
 }
@@ -117,11 +111,28 @@ fn annotate_node(source: &str, node: &mut ParsedNode, cursor: usize) -> usize {
         pos = annotate_node(source, child, pos);
     }
 
-    let close_end = find_close_tag(source, tag_lower, pos);
+    let (close_tag_start, close_end) = find_close_tag(source, tag_lower, pos);
     node.span = Span {
         start: open_start,
         end: close_end,
     };
+
+    let mut last_end = open_end;
+    for i in 0..node.children.len() {
+        if node.children[i].tag_name.is_empty() && !node.children[i].text_content.is_empty() {
+            let next_start = node.children[i + 1..]
+                .iter()
+                .find(|c| !c.tag_name.is_empty())
+                .map(|c| c.span.start)
+                .unwrap_or(close_tag_start);
+            node.children[i].span = Span {
+                start: last_end,
+                end: next_start,
+            };
+        } else {
+            last_end = node.children[i].span.end;
+        }
+    }
 
     close_end
 }
@@ -204,7 +215,7 @@ fn is_void_element(tag: &str) -> bool {
     )
 }
 
-fn find_close_tag(source: &str, tag_name: &str, mut pos: usize) -> usize {
+fn find_close_tag(source: &str, tag_name: &str, mut pos: usize) -> (usize, usize) {
     let bytes = source.as_bytes();
     let len = bytes.len();
     let close_pattern = format!("</{}", tag_name);
@@ -221,20 +232,17 @@ fn find_close_tag(source: &str, tag_name: &str, mut pos: usize) -> usize {
                     || after_tag.as_bytes()[0].is_ascii_whitespace()
                     || after_tag.as_bytes()[0] == b'>'
                 {
+                    let close_tag_start = pos;
                     let mut close_end = pos + close_pattern.len();
                     while close_end < len && bytes[close_end] != b'>' {
                         close_end += 1;
                     }
-                    return close_end + 1;
+                    return (close_tag_start, close_end + 1);
                 }
             }
         }
         pos += 1;
     }
 
-    len
-}
-
-fn normalize_whitespace(value: &str) -> String {
-    value.split_whitespace().collect::<Vec<_>>().join(" ")
+    (len, len)
 }
