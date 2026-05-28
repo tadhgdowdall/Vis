@@ -162,10 +162,9 @@ fn analyze_node(
         || tab_index.is_some_and(|value| value.trim() != "-1");
 
     let accessible_name = match resolved_tag.as_str() {
-        "button" => (!text_content.is_empty())
-            .then_some(text_content.clone())
-            .or_else(|| accessible_name_from_references(aria_labelledby, context))
-            .or_else(|| aria_label.filter(|label| !label.is_empty())),
+        "button" => accessible_name_from_references(aria_labelledby, context)
+            .or_else(|| aria_label.filter(|l| !l.is_empty()))
+            .or_else(|| (!text_content.is_empty()).then_some(text_content.clone())),
         "input" => accessible_name_for_input(
             node,
             wrapping_label,
@@ -176,19 +175,19 @@ fn analyze_node(
             aria_label,
             context,
         ),
-        "select" | "textarea" => native_label_for_control(node, wrapping_label, context)
-            .or_else(|| accessible_name_from_references(aria_labelledby, context))
-            .or_else(|| aria_label.filter(|label| !label.is_empty())),
-        "img" => alt_text.clone(),
-        "a" => (!text_content.is_empty())
-            .then_some(text_content.clone())
-            .or_else(|| accessible_name_from_descendant_images(node, &context.component_map))
-            .or_else(|| accessible_name_from_references(aria_labelledby, context))
-            .or_else(|| aria_label.filter(|label| !label.is_empty())),
-        _ => (!text_content.is_empty())
-            .then_some(text_content.clone())
-            .or_else(|| accessible_name_from_references(aria_labelledby, context))
-            .or_else(|| aria_label.filter(|label| !label.is_empty())),
+        "select" | "textarea" => accessible_name_from_references(aria_labelledby, context)
+            .or_else(|| aria_label.filter(|l| !l.is_empty()))
+            .or_else(|| native_label_for_control(node, wrapping_label, context)),
+        "img" => accessible_name_from_references(aria_labelledby, context)
+            .or_else(|| aria_label.filter(|l| !l.is_empty()))
+            .or_else(|| alt_text.clone()),
+        "a" => accessible_name_from_references(aria_labelledby, context)
+            .or_else(|| aria_label.filter(|l| !l.is_empty()))
+            .or_else(|| (!text_content.is_empty()).then_some(text_content.clone()))
+            .or_else(|| accessible_name_from_descendant_images(node, &context.component_map)),
+        _ => accessible_name_from_references(aria_labelledby, context)
+            .or_else(|| aria_label.filter(|l| !l.is_empty()))
+            .or_else(|| (!text_content.is_empty()).then_some(text_content.clone())),
     };
 
     A11yNode {
@@ -248,7 +247,7 @@ fn accessible_name_for_input(
     aria_label: Option<String>,
     context: &AnalysisContext,
 ) -> Option<String> {
-    match input_type {
+    let text_source = match input_type {
         Some("submit") => input_value
             .filter(|value| !value.is_empty())
             .or_else(|| Some("Submit".to_string())),
@@ -256,17 +255,15 @@ fn accessible_name_for_input(
             .filter(|value| !value.is_empty())
             .or_else(|| Some("Reset".to_string())),
         Some("button") => input_value
-            .filter(|value| !value.is_empty())
-            .or_else(|| accessible_name_from_references(aria_labelledby, context))
-            .or_else(|| aria_label.filter(|label| !label.is_empty())),
+            .filter(|value| !value.is_empty()),
         Some("image") => alt_text
-            .filter(|text| !text.is_empty())
-            .or_else(|| accessible_name_from_references(aria_labelledby, context))
-            .or_else(|| aria_label.filter(|label| !label.is_empty())),
-        _ => native_label_for_control(node, wrapping_label, context)
-            .or_else(|| accessible_name_from_references(aria_labelledby, context))
-            .or_else(|| aria_label.filter(|label| !label.is_empty())),
-    }
+            .filter(|text| !text.is_empty()),
+        _ => native_label_for_control(node, wrapping_label, context),
+    };
+
+    accessible_name_from_references(aria_labelledby, context)
+        .or_else(|| aria_label.filter(|l| !l.is_empty()))
+        .or_else(|| text_source)
 }
 
 fn accessible_name_from_descendant_images(
