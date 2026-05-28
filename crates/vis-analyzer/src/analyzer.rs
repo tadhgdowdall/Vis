@@ -254,16 +254,14 @@ fn accessible_name_for_input(
         Some("reset") => input_value
             .filter(|value| !value.is_empty())
             .or_else(|| Some("Reset".to_string())),
-        Some("button") => input_value
-            .filter(|value| !value.is_empty()),
-        Some("image") => alt_text
-            .filter(|text| !text.is_empty()),
+        Some("button") => input_value.filter(|value| !value.is_empty()),
+        Some("image") => alt_text.filter(|text| !text.is_empty()),
         _ => native_label_for_control(node, wrapping_label, context),
     };
 
     accessible_name_from_references(aria_labelledby, context)
         .or_else(|| aria_label.filter(|l| !l.is_empty()))
-        .or_else(|| text_source)
+        .or(text_source)
 }
 
 fn accessible_name_from_descendant_images(
