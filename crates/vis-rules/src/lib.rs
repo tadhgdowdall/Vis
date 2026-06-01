@@ -5,7 +5,13 @@ use std::collections::HashMap;
 use vis_diagnostics::{Diagnostic, Severity, Span};
 use vis_ir::A11yNode;
 
-type RuleFn = fn(&str, &A11yNode, &mut Vec<Diagnostic>);
+pub(crate) type RuleFn = fn(&str, &A11yNode, &mut Vec<Diagnostic>);
+
+pub(crate) struct Rule {
+    pub code: &'static str,
+    pub default_severity: Severity,
+    pub check: RuleFn,
+}
 
 pub fn run_all(file_path: &str, nodes: &[A11yNode]) -> Vec<Diagnostic> {
     run_all_with_config(file_path, nodes, &HashMap::new())
@@ -16,26 +22,25 @@ pub fn run_all_with_config(
     nodes: &[A11yNode],
     rule_config: &HashMap<String, Severity>,
 ) -> Vec<Diagnostic> {
-    let default_severities: &[(&str, Severity)] = rules::DEFAULT_SEVERITIES;
-
-    let effective_severities: HashMap<&str, Severity> = default_severities
+    let effective_severities: HashMap<&str, Severity> = rules::ALL
         .iter()
-        .map(|&(code, default)| {
-            let severity = rule_config.get(code).copied().unwrap_or(default);
-            (code, severity)
+        .map(|rule| {
+            let severity = rule_config
+                .get(rule.code)
+                .copied()
+                .unwrap_or(rule.default_severity);
+            (rule.code, severity)
         })
         .collect();
 
     let mut diagnostics = Vec::new();
 
     for node in nodes {
-        for (i, rule) in rules::ALL.iter().enumerate() {
-            if let Some(&(code, _)) = default_severities.get(i)
-                && !effective_severities[code].is_enabled()
-            {
+        for rule in rules::ALL {
+            if !effective_severities[rule.code].is_enabled() {
                 continue;
             }
-            rule(file_path, node, &mut diagnostics);
+            (rule.check)(file_path, node, &mut diagnostics);
         }
     }
 
@@ -69,8 +74,11 @@ fn find_node_suppression(node: &A11yNode, span: Span, code: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::run_all;
+    use std::collections::HashMap;
+
+    use super::{run_all, run_all_with_config};
     use vis_analyzer::analyze;
+    use vis_diagnostics::Severity;
     use vis_parser::parse_html;
 
     #[test]
@@ -152,7 +160,29 @@ mod tests {
         let diagnostics = run_all("example.html", &analyzed);
 
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].code, "a11y::clickable_div");
+        assert!(diagnostics.iter().any(|d| d.code == "a11y::clickable_div"));
+        assert!(
+            diagnostics
+                .iter()
+                .all(|d| d.code != "a11y::keyboard_handler")
+        );
+    }
+
+    #[test]
+    fn emits_keyboard_handler_for_custom_control_semantics() {
+        let parsed = parse_html(
+            r#"<span role="button" tabindex="0" onClick="openDialog()">Open dialog</span>"#,
+        )
+        .expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all("example.html", &analyzed);
+
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d.code == "a11y::keyboard_handler")
+        );
     }
 
     #[test]
@@ -413,13 +443,27 @@ mod tests {
     }
 
     #[test]
-    fn flags_email_input_without_autocomplete() {
+    fn flags_email_input_without_autocomplete_when_rule_enabled() {
+        let parsed = parse_html(r#"<input type="email" />"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+        let diagnostics = run_all_with_config(
+            "example.html",
+            &analyzed,
+            &HashMap::from([("a11y::autocomplete".to_string(), Severity::Warning)]),
+        );
+
+        assert!(diagnostics.iter().any(|d| d.code == "a11y::autocomplete"));
+    }
+
+    #[test]
+    fn allows_email_input_without_autocomplete_by_default() {
         let parsed = parse_html(r#"<input type="email" />"#).expect("html should parse");
 
         let analyzed = analyze(&parsed);
         let diagnostics = run_all("example.html", &analyzed);
 
-        assert!(diagnostics.iter().any(|d| d.code == "a11y::autocomplete"));
+        assert!(diagnostics.iter().all(|d| d.code != "a11y::autocomplete"));
     }
 
     #[test]

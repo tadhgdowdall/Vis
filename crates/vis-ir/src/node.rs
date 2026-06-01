@@ -10,6 +10,7 @@ pub struct A11yNode {
     pub focusable: bool,
     pub accessible_name: Option<String>,
     pub has_click_handler: bool,
+    pub has_keyboard_handler: bool,
     pub alt_text: Option<String>,
     pub tab_index: Option<String>,
     pub heading_level: Option<u8>,

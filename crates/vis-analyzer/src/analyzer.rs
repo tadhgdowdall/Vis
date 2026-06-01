@@ -100,7 +100,17 @@ fn analyze_node(
         .attributes
         .iter()
         .any(|attribute| attribute.name.eq_ignore_ascii_case("onclick"));
-    let href = node.attribute_value("href");
+    let has_keyboard_handler = node.attributes.iter().any(|attribute| {
+        matches!(
+            attribute.name.to_ascii_lowercase().as_str(),
+            "onkeydown" | "onkeyup"
+        )
+    });
+    let href = node.attribute_value("href").or_else(|| {
+        (resolved_tag == "a" && tag_name != "a")
+            .then(|| node.attribute_value("to"))
+            .flatten()
+    });
     let tab_index = node.attribute_value("tabindex");
     let aria_labelledby = node.attribute_value("aria-labelledby");
     let aria_label = node.attribute_value("aria-label").map(normalize_text);
@@ -199,6 +209,7 @@ fn analyze_node(
         focusable,
         accessible_name,
         has_click_handler,
+        has_keyboard_handler,
         alt_text,
         tab_index: tab_index.map(str::to_string),
         heading_level,
@@ -355,17 +366,7 @@ fn resolve_element(component: &str, component_map: &HashMap<String, String>) -> 
         return component.to_string();
     }
 
-    match component {
-        "btn" | "iconbutton" | "closebutton" | "togglebutton" | "menubutton" => "button",
-        "textfield" | "textinput" | "searchinput" => "input",
-        "link" | "navlink" | "hyperlink" | "skiplink" => "a",
-        "image" | "picture" | "avatar" | "thumbnail" => "img",
-        "dropdown" | "combobox" | "multiselect" => "select",
-        "textbox" | "richtext" => "textarea",
-        "formlabel" | "fieldlabel" => "label",
-        _ => component,
-    }
-    .to_string()
+    component.to_string()
 }
 
 fn heading_level_from_tag(tag: &str) -> Option<u8> {
@@ -386,7 +387,9 @@ fn normalize_text(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::analyze;
+    use std::collections::HashMap;
+
+    use super::{analyze, analyze_with_map};
     use vis_parser::parse_html;
 
     #[test]
@@ -512,5 +515,28 @@ mod tests {
         assert!(div.interactive);
         assert!(!div.focusable);
         assert!(div.has_click_handler);
+    }
+
+    #[test]
+    fn does_not_guess_custom_component_semantics_without_mapping() {
+        let parsed = parse_html(r#"<Avatar src="/user.png" />"#).expect("html should parse");
+
+        let analyzed = analyze(&parsed);
+
+        assert_eq!(analyzed[0].resolved_tag_name, "avatar");
+        assert!(analyzed[0].alt_text.is_none());
+    }
+
+    #[test]
+    fn maps_configured_component_link_to_to_prop() {
+        let parsed =
+            parse_html(r#"<NavLink to="/reports">Reports</NavLink>"#).expect("html should parse");
+        let component_map = HashMap::from([("navlink".to_string(), "a".to_string())]);
+
+        let analyzed = analyze_with_map(&parsed, Some(component_map));
+
+        assert_eq!(analyzed[0].resolved_tag_name, "a");
+        assert_eq!(analyzed[0].href.as_deref(), Some("/reports"));
+        assert!(analyzed[0].focusable);
     }
 }
