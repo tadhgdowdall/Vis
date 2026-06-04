@@ -4,6 +4,8 @@ use std::{env, fs, path::PathBuf};
 use serde::Deserialize;
 use vis_diagnostics::Severity;
 
+use crate::error::CliError;
+
 #[derive(Deserialize, Default)]
 struct RawConfig {
     #[serde(default)]
@@ -15,7 +17,6 @@ struct RawConfig {
 }
 
 #[derive(Default, Debug)]
-#[allow(dead_code)]
 pub struct Config {
     pub components: HashMap<String, String>,
     pub rules: HashMap<String, Severity>,
@@ -23,10 +24,19 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load() -> Option<Self> {
-        let path = find_config()?;
-        let contents = fs::read_to_string(&path).ok()?;
-        let raw: RawConfig = toml::from_str(&contents).ok()?;
+    pub fn load() -> Result<Self, CliError> {
+        let Some(path) = find_config() else {
+            return Ok(Self::default());
+        };
+
+        let contents = fs::read_to_string(&path).map_err(|error| CliError::Config {
+            path: path.display().to_string(),
+            message: error.to_string(),
+        })?;
+        let raw: RawConfig = toml::from_str(&contents).map_err(|error| CliError::Config {
+            path: path.display().to_string(),
+            message: error.to_string(),
+        })?;
 
         let components: HashMap<String, String> = raw
             .components
@@ -48,7 +58,7 @@ impl Config {
             })
             .collect();
 
-        Some(Config {
+        Ok(Config {
             components,
             rules,
             exclude: raw.exclude,
